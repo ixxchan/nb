@@ -4,13 +4,6 @@ use crypto::sha2::Sha256;
 use serde::{Deserialize, Serialize};
 use crypto::digest::Digest;
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
-}
 
 #[derive(Serialize, Deserialize)]
 struct Block {
@@ -23,6 +16,7 @@ struct Block {
 
 pub struct Blockchain {
     current_transactions: Vec<Transaction>,
+    // blocks is non-empty
     blocks: Vec<Block>,
 }
 
@@ -45,9 +39,11 @@ impl Blockchain {
         self.blocks.push(block);
     }
 
-    /// Adds a new transaction to the list of transactions
-    pub fn new_transaction(&mut self, sender: String, recipient: String, amount: i64) {
+    /// Adds a new transaction to the list of transactions.
+    /// Returns the index of the Block that will hold this transaction
+    pub fn new_transaction(&mut self, sender: String, recipient: String, amount: i64) -> u64{
         self.current_transactions.push(Transaction { sender, recipient, amount });
+        (self.blocks.len() + 1) as u64
     }
 
     /// Hashes a Block
@@ -63,7 +59,7 @@ impl Blockchain {
         &self.blocks.last().unwrap()
     }
 
-    fn proof_of_work(&self, last_proof: u64) -> u64 {
+    fn proof_of_work(last_proof: u64) -> u64 {
         let mut proof = 0;
         while Blockchain::valid_proof(last_proof, proof) == false {
             proof += 1;
@@ -84,4 +80,19 @@ struct Transaction {
     sender: String,
     recipient: String,
     amount: i64,
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_pow() {
+        assert!(Blockchain::valid_proof(100, 35293));
+        assert!(Blockchain::valid_proof(35293, 35089));
+
+        assert_eq!(Blockchain::proof_of_work(100), 35293);
+        assert_eq!(Blockchain::proof_of_work(35293), 35089);
+    }
 }
