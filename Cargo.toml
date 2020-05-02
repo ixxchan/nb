@@ -1,5 +1,5 @@
 [package]
-name = "sb"
+name = "nb"
 version = "0.1.0"
 authors = ["xxchan <xxchan@sjtu.edu.cn>"]
 edition = "2018"

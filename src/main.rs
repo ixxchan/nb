@@ -2,11 +2,11 @@
 extern crate log;
 
 use clap::{App, AppSettings, Arg};
-use sb::Blockchain;
+use nb::Blockchain;
 use env_logger::Env;
 
 fn main() {
-    let matches = App::new("sb")
+    let matches = App::new("nb")
         .version(env!("CARGO_PKG_VERSION"))
         .author(env!("CARGO_PKG_AUTHORS"))
         .about("A simple blockchain node")
@@ -25,7 +25,7 @@ fn main() {
 
     env_logger::from_env(Env::default().default_filter_or("info")).init();
 
-    info!("sb {}", env!("CARGO_PKG_VERSION"));
+    info!("nb {}", env!("CARGO_PKG_VERSION"));
     info!("Listening on {}", addr);
 
     run_node(addr);

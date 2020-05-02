@@ -1,2 +1,2 @@
-# sb
-simple blockchain in Rust
+# nb
+naïve blockchain in Rust
