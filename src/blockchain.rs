@@ -1,11 +1,10 @@
 //! The blockchain data structure
 
-use std::time::SystemTime;
-use std::mem;
+use crypto::digest::Digest;
 use crypto::sha2::Sha256;
 use serde::{Deserialize, Serialize};
-use crypto::digest::Digest;
-
+use std::mem;
+use std::time::SystemTime;
 
 #[derive(Serialize, Deserialize)]
 pub struct Block {
@@ -17,9 +16,13 @@ pub struct Block {
 }
 
 impl Block {
-    pub fn get_proof(&self) -> u64 { self.proof }
+    pub fn get_proof(&self) -> u64 {
+        self.proof
+    }
 
-    pub fn get_index(&self) -> u64 { self.index }
+    pub fn get_index(&self) -> u64 {
+        self.index
+    }
     /// Hashes a Block
     pub fn get_hash(&self) -> String {
         let block_string = serde_json::to_string(self).unwrap();
@@ -37,7 +40,14 @@ pub struct Blockchain {
 
 impl Blockchain {
     /// Creates a new Blockchain node
-    pub fn new() -> Self { unimplemented!() }
+    pub fn new() -> Self {
+        let mut chain = Blockchain {
+            current_transactions: vec![],
+            blocks: vec![],
+        };
+        chain.new_block(100, "1".to_owned());
+        chain
+    }
 
     /// Creates a new Block and adds it to the chain
     pub fn new_block(&mut self, proof: u64, previous_hash: String) -> &Block {
@@ -65,7 +75,6 @@ impl Blockchain {
         });
         (self.blocks.len() + 1) as u64
     }
-
 
     /// Returns the last Block in the chain
     pub fn last_block(&self) -> &Block {
@@ -95,7 +104,6 @@ struct Transaction {
     recipient: String,
     amount: i64,
 }
-
 
 #[cfg(test)]
 mod tests {

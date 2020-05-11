@@ -1,13 +1,19 @@
 //! The blockchain node
 use crate::Blockchain;
 
-struct Node {
+pub struct Node {
     index: u64,
     chain: Blockchain,
 }
 
 impl Node {
-    pub fn new() -> Self { unimplemented!() }
+    pub fn new() -> Self {
+        /// TODO: how to assign index?
+        Node {
+            index: 0,
+            chain: Blockchain::new(),
+        }
+    }
 
     /// Mines a new block
     pub fn mine(&mut self) {
@@ -19,15 +25,24 @@ impl Node {
         self.new_transaction("0", &self.index.to_string(), 1);
 
         let block = self.chain.new_block(proof, last_hash);
-        info!("[Node {}] A new block {} is forged", self.index, block.get_index());
+        info!(
+            "[Node {}] A new block {} is forged",
+            self.index,
+            block.get_index()
+        );
     }
 
     /// Adds a new transaction
     pub fn new_transaction(&mut self, sender: &str, receiver: &str, amount: i64) {
         self.chain.new_transaction(sender, receiver, amount);
-        info!("[Node {}] A new transaction is added: {} -> {}, amount: {}", self.index, sender, receiver, amount);
+        info!(
+            "[Node {}] A new transaction is added: {} -> {}, amount: {}",
+            self.index, sender, receiver, amount
+        );
     }
 
     /// Displays the full blockchain
-    pub fn display() { unimplemented!() }
+    pub fn display(&self) {
+        println!("not implemented!");
+    }
 }

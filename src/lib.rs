@@ -5,3 +5,4 @@ mod blockchain;
 mod node;
 
 pub use blockchain::Blockchain;
+pub use node::Node;
