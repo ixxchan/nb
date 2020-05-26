@@ -5,11 +5,16 @@ use crypto::sha2::Sha256;
 use serde::{Deserialize, Serialize};
 use std::mem;
 use std::time::SystemTime;
+use std::io::stdout;
+
+fn get_time() -> u128 {
+    SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis()
+}
 
 #[derive(Serialize, Deserialize)]
 pub struct Block {
     index: u64,
-    timestamp: SystemTime,
+    timestamp: u128,
     proof: u64,
     transactions: Vec<Transaction>,
     previous_hash: String,
@@ -31,6 +36,7 @@ impl Block {
         hasher.result_str()
     }
 }
+
 
 pub struct Blockchain {
     current_transactions: Vec<Transaction>,
@@ -55,7 +61,7 @@ impl Blockchain {
 
         let block = Block {
             index: (self.blocks.len() + 1) as u64,
-            timestamp: SystemTime::now(),
+            timestamp: get_time(),
             proof,
             transactions,
             previous_hash,
@@ -65,7 +71,8 @@ impl Blockchain {
         self.last_block()
     }
 
-    /// Adds a new transaction to the list of transactions.
+    /// Adds a new transaction to the list of transactions
+    /// (which will go into the next mined block).
     /// Returns the index of the Block that will hold this transaction
     pub fn new_transaction(&mut self, sender: &str, recipient: &str, amount: i64) -> u64 {
         self.current_transactions.push(Transaction {
@@ -95,6 +102,10 @@ impl Blockchain {
         let mut hasher = Sha256::new();
         hasher.input_str(&format!("{}{}", last_proof, proof));
         return &hasher.result_str()[0..4] == "0000";
+    }
+
+    pub fn display(&self) {
+        serde_json::to_writer_pretty(stdout(), &self.blocks);
     }
 }
 

@@ -8,7 +8,7 @@ pub struct Node {
 
 impl Node {
     pub fn new() -> Self {
-        /// TODO: how to assign index?
+        // TODO: how to assign index?
         Node {
             index: 0,
             chain: Blockchain::new(),
@@ -43,6 +43,6 @@ impl Node {
 
     /// Displays the full blockchain
     pub fn display(&self) {
-        println!("not implemented!");
+        self.chain.display();
     }
 }

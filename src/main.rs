@@ -3,7 +3,7 @@ extern crate log;
 
 use clap::{App, AppSettings, Arg};
 use env_logger::Env;
-use nb::{Blockchain, Node};
+use nb::Node;
 use std::io::{stdin, stdout, Write};
 
 fn main() {
@@ -39,7 +39,7 @@ fn run_node(addr: &str) {
         let mut input = String::new();
         // a prompt for input
         print!("> ");
-        stdout().flush();
+        stdout().flush().expect("flush error");
 
         stdin().read_line(&mut input).expect("cannot read input");
 
@@ -60,6 +60,7 @@ fn run_node(addr: &str) {
         const LIST_PEERS: &str = "list_peers";
         const EXIT: &str = "exit";
         const HELP: &str = "help";
+        const MINE: &str = "mine";
 
         match command {
             NEW_TRANS => {
@@ -79,6 +80,9 @@ fn run_node(addr: &str) {
                 };
                 node.new_transaction(sender, receiver, amount);
             }
+            MINE => {
+                node.mine();
+            }
             SEE_BLOCKCHAIN => {
                 node.display();
             }
@@ -96,15 +100,12 @@ fn run_node(addr: &str) {
 }
 
 pub fn list_commands() {
-    println!("blockchain node commands:\n");
-    println!(
-        "new_trans [sender] [receiver] [amount] - Adds a new transaction into the local blockchain"
-    );
-    //    println!("Example: add_block 10 \n");
-    println!("list_blocks - list the local chain blocks");
+    println!(concat!("blockchain node commands:\n",
+    "  mine - mines a new block\n",
+    "  new_trans [sender] [receiver] [amount] - adds a new transaction into the local blockchain\n",
+    "  list_blocks - list the local chain blocks\n",
+    "  exit - quit the program"));
     //    println!("add_peer - add one node as a peer");
     //    println!("Example: add_peer 172.17.0.10\n");
     //    println!("list_peers - list the peers\n");
-    println!("exit - quit the program");
-    println!();
 }
