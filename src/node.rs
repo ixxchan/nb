@@ -9,7 +9,6 @@ pub struct Node {
 
 impl Node {
     pub fn new() -> Self {
-        // TODO: how to assign index?
         Node {
             index: Uuid::new_v4(),
             chain: Blockchain::new(),
