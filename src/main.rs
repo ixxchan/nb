@@ -44,7 +44,7 @@ fn run_node(addr: &str) {
         stdin().read_line(&mut input).expect("cannot read input");
 
         let input = input.trim();
-        let args: Vec<&str> = input.split(" ").collect();
+        let args: Vec<&str> = input.split_whitespace().collect();
         let command = match args.get(0) {
             Some(value) => *value,
             None => {
