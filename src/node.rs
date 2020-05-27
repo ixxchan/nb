@@ -19,7 +19,7 @@ impl Node {
     /// Mines a new block
     pub fn mine(&mut self) {
         let last_block = self.chain.last_block();
-        let proof = Blockchain::proof_of_work(last_block.get_proof());
+        let proof = self.chain.run_pow();
         let last_hash = last_block.get_hash();
         // receive a reward for finding the proof.
         // The sender is "0" to signify that this node has mined a new coin.

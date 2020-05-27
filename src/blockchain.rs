@@ -21,10 +21,6 @@ pub struct Block {
 }
 
 impl Block {
-    pub fn get_proof(&self) -> u64 {
-        self.proof
-    }
-
     pub fn get_index(&self) -> u64 {
         self.index
     }
@@ -95,6 +91,11 @@ impl Blockchain {
             proof += 1;
         }
         proof
+    }
+
+    /// Run pow in the chain
+    pub fn run_pow(&self) -> u64 {
+        Blockchain::proof_of_work(self.last_block().proof)
     }
 
     /// Validates the Proof. Does hash(last_proof, proof) contain 4 leading zeroes?
