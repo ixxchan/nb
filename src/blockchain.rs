@@ -108,7 +108,36 @@ impl Blockchain {
     pub fn display(&self) {
         serde_json::to_writer_pretty(stdout(), &self.blocks).expect("fail to display blockchain");
     }
+
+    /// Validates a given blockchain.
+    pub fn valid_chain(chain: &Self) -> bool {
+        let mut last_block = &chain.blocks[0];
+        let mut block;
+
+        // check the genesis block
+        if last_block.proof != 100 ||
+            last_block.transactions.len() != 0 ||
+            last_block.previous_hash != "1".to_owned() {
+            return false;
+        }
+
+        for i in 1..chain.blocks.len() {
+            block = &chain.blocks[i];
+            debug!("last_block: {}", serde_json::to_string(&last_block).unwrap());
+            debug!("block: {}", serde_json::to_string(&block).unwrap());
+            debug!("");
+            if last_block.get_hash() != block.previous_hash {
+                return false;
+            }
+            if !Blockchain::valid_proof(last_block.proof, block.proof) {
+                return false;
+            }
+            last_block = block;
+        }
+        true
+    }
 }
+
 
 #[derive(Serialize, Deserialize)]
 struct Transaction {
@@ -120,6 +149,7 @@ struct Transaction {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use env_logger::Env;
 
     #[test]
     fn test_pow() {
@@ -128,5 +158,68 @@ mod tests {
 
         assert_eq!(Blockchain::proof_of_work(100), 35293);
         assert_eq!(Blockchain::proof_of_work(35293), 35089);
+    }
+
+    #[test]
+    fn test_valid_chain() {
+//        env_logger::from_env(Env::default().default_filter_or("debug")).init();
+
+        let mut chain = Blockchain::new();
+        assert!(Blockchain::valid_chain(&chain));
+
+        // play with the genesis block
+        chain.blocks[0].transactions.push(Transaction {
+            sender: "good".to_owned(),
+            recipient: "evil".to_owned(),
+            amount: 100,
+        });
+        assert!(!Blockchain::valid_chain(&chain));
+        chain.blocks[0].transactions.pop();
+        assert!(Blockchain::valid_chain(&chain));
+        chain.blocks[0].proof = 101;
+        assert!(!Blockchain::valid_chain(&chain));
+        chain.blocks[0].proof = 100;
+        assert!(Blockchain::valid_chain(&chain));
+        chain.blocks[0].previous_hash = "2".to_owned();
+        assert!(!Blockchain::valid_chain(&chain));
+        chain.blocks[0].previous_hash = "1".to_owned();
+        assert!(Blockchain::valid_chain(&chain));
+
+        // perform some normal operations
+        chain.new_transaction("0", "1", 1);
+        chain.new_transaction("1", "2", 2);
+        chain.new_transaction("2", "3", 3);
+        chain.new_block(chain.run_pow(), chain.last_block().get_hash());
+        assert!(Blockchain::valid_chain(&chain));
+        chain.new_block(chain.run_pow(), chain.last_block().get_hash());
+        assert!(Blockchain::valid_chain(&chain));
+
+        // tamper an intermediate block
+        chain.blocks[1].transactions.push(Transaction {
+            sender: "good".to_owned(),
+            recipient: "evil".to_owned(),
+            amount: 100,
+        });
+        assert!(!Blockchain::valid_chain(&chain));
+        chain.blocks[1].transactions.pop();
+        assert!(Blockchain::valid_chain(&chain));
+        let true_proof = mem::replace(&mut chain.blocks[1].proof, 123);
+        assert!(!Blockchain::valid_chain(&chain));
+        chain.blocks[1].proof = true_proof;
+        assert!(Blockchain::valid_chain(&chain));
+
+        // add a block without running pow
+        chain.new_block(456, chain.last_block().get_hash());
+        assert!(!Blockchain::valid_chain(&chain));
+        chain.blocks.pop();
+        assert!(Blockchain::valid_chain(&chain));
+
+        // play with the genesis block again
+        chain.blocks[0].transactions.push(Transaction {
+            sender: "good".to_owned(),
+            recipient: "evil".to_owned(),
+            amount: 100,
+        });
+        assert!(!Blockchain::valid_chain(&chain));
     }
 }
