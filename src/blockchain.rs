@@ -105,7 +105,7 @@ impl Blockchain {
     }
 
     pub fn display(&self) {
-        serde_json::to_writer_pretty(stdout(), &self.blocks);
+        serde_json::to_writer_pretty(stdout(), &self.blocks).expect("fail to display blockchain");
     }
 }
 

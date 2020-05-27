@@ -1,8 +1,9 @@
 //! The blockchain node
 use crate::Blockchain;
+use uuid::Uuid;
 
 pub struct Node {
-    index: u64,
+    index: Uuid,
     chain: Blockchain,
 }
 
@@ -10,7 +11,7 @@ impl Node {
     pub fn new() -> Self {
         // TODO: how to assign index?
         Node {
-            index: 0,
+            index: Uuid::new_v4(),
             chain: Blockchain::new(),
         }
     }
