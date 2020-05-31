@@ -3,13 +3,13 @@ extern crate log;
 
 use clap::{App, AppSettings, Arg};
 use env_logger::Env;
-use std::io::{stdin, stdout, Write};
-use std::thread;
-use std::sync::{Arc, Mutex};
-use std::net::TcpListener;
-use serde_json::Deserializer;
 use nb::message::Message;
 use nb::{Node, Result};
+use serde_json::Deserializer;
+use std::io::{stdin, stdout, Write};
+use std::net::TcpListener;
+use std::sync::{Arc, Mutex};
+use std::thread;
 
 fn main() {
     let matches = App::new("nb")
@@ -144,12 +144,12 @@ fn handle_incoming_connections(node: Arc<Mutex<Node>>, addr: String) -> Result<(
             Ok(mut stream) => {
                 debug!("waiting for request");
                 // There should be only one request, but we have to deserialize from a stream in this way
-                for request in Deserializer::from_reader(stream.try_clone()?).into_iter::<Message>() {
-                    let request =
-                        request.map_err(|e| failure::err_msg(format!("Deserializing error {}", e)))?;
+                for request in Deserializer::from_reader(stream.try_clone()?).into_iter::<Message>()
+                {
+                    let request = request
+                        .map_err(|e| failure::err_msg(format!("Deserializing error {}", e)))?;
                     debug!("request received {:?}", request);
-                    if let Message::Request = request
-                    {
+                    if let Message::Request = request {
                         let response = Message::Response(node.lock().unwrap().get_blocks());
                         serde_json::to_writer(&mut stream, &response)?;
                         stream.flush()?;

@@ -3,12 +3,15 @@
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
 use serde::{Deserialize, Serialize};
+use std::io::stdout;
 use std::mem;
 use std::time::SystemTime;
-use std::io::stdout;
 
 fn get_time() -> u128 {
-    SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis()
+    SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_millis()
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -32,7 +35,6 @@ impl Block {
         hasher.result_str()
     }
 }
-
 
 pub struct Blockchain {
     current_transactions: Vec<Transaction>,
@@ -133,16 +135,20 @@ impl Blockchain {
         let mut block;
 
         // check the genesis block
-        if last_block.proof != 100 ||
-            last_block.transactions.len() != 0 ||
-            last_block.previous_hash != "1".to_owned() {
+        if last_block.proof != 100
+            || last_block.transactions.len() != 0
+            || last_block.previous_hash != "1".to_owned()
+        {
             return false;
         }
 
         for i in 1..chain.blocks.len() {
             block = &chain.blocks[i];
             trace!("validating chain ...");
-            trace!("last_block: {}", serde_json::to_string(&last_block).unwrap());
+            trace!(
+                "last_block: {}",
+                serde_json::to_string(&last_block).unwrap()
+            );
             trace!("block: {}", serde_json::to_string(&block).unwrap());
             trace!("");
             if last_block.get_hash() != block.previous_hash {
@@ -156,7 +162,6 @@ impl Blockchain {
         true
     }
 }
-
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 struct Transaction {
@@ -181,7 +186,7 @@ mod tests {
 
     #[test]
     fn test_valid_chain() {
-//        env_logger::from_env(Env::default().default_filter_or("debug")).init();
+        //        env_logger::from_env(Env::default().default_filter_or("debug")).init();
 
         let mut chain = Blockchain::new();
         assert!(Blockchain::valid_chain(&chain));

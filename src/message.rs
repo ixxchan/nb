@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use crate::Block;
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum Message {

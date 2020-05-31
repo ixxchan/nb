@@ -1,11 +1,11 @@
 //! The blockchain node
 //! TODO: Now the nodes should get synced manually. Consider adding auto message broadcasting mechanism
-use crate::*;
 use crate::message::Message;
-use uuid::Uuid;
-use std::net::{TcpStream, SocketAddr, ToSocketAddrs};
-use std::io::Write;
+use crate::*;
 use serde_json::Deserializer;
+use std::io::Write;
+use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
+use uuid::Uuid;
 
 pub struct Node {
     index: Uuid,
@@ -67,7 +67,7 @@ impl Node {
                 self.peers.push(addr[0]);
                 true
             }
-            Err(_) => { false }
+            Err(_) => false,
         }
     }
 
@@ -77,20 +77,28 @@ impl Node {
     pub fn resolve_conflicts(&mut self) -> bool {
         let mut ret = false;
         let peers = self.peers.clone();
-        debug!("[Node {}] Resolve conflict with peers :{:?}", self.index, peers);
+        debug!(
+            "[Node {}] Resolve conflict with peers :{:?}",
+            self.index, peers
+        );
         for peer in peers.iter() {
             debug!("Connecting {}", peer);
             match TcpStream::connect(peer) {
                 Ok(stream) => {
-                    debug!("[Node {}] Resolve conflict with peer :{:?}", self.index, peer);
+                    debug!(
+                        "[Node {}] Resolve conflict with peer :{:?}",
+                        self.index, peer
+                    );
                     match self.resolve_conflict(stream) {
-                        Ok(flag) => { ret = ret || flag; }
+                        Ok(flag) => {
+                            ret = ret || flag;
+                        }
                         Err(e) => {
                             error!("Error when communicating with {}: {}", peer, e);
                         }
                     }
                 }
-                Err(e) => { error!("Connection to {} failed: {}", peer, e) }
+                Err(e) => error!("Connection to {} failed: {}", peer, e),
             }
         }
         ret
@@ -120,4 +128,3 @@ impl Node {
         return Err(failure::err_msg("No response"));
     }
 }
-
