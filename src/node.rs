@@ -1,10 +1,16 @@
 //! The blockchain node
-use crate::Blockchain;
+//! TODO: Now the nodes should get synced manually. Consider adding auto message broadcasting mechanism
+use crate::*;
+use crate::message::Message;
 use uuid::Uuid;
+use std::net::{TcpStream, SocketAddr, ToSocketAddrs};
+use std::io::Write;
+use serde_json::Deserializer;
 
 pub struct Node {
     index: Uuid,
     chain: Blockchain,
+    peers: Vec<SocketAddr>,
 }
 
 impl Node {
@@ -12,7 +18,13 @@ impl Node {
         Node {
             index: Uuid::new_v4(),
             chain: Blockchain::new(),
+            peers: Vec::new(),
         }
+    }
+
+    /// Returns a copy of the blocks the node owns
+    pub fn get_blocks(&self) -> Vec<Block> {
+        self.chain.get_blocks()
     }
 
     /// Mines a new block
@@ -45,4 +57,67 @@ impl Node {
     pub fn display(&self) {
         self.chain.display();
     }
+
+    /// Adds a new peer. Returns false if `addr` is not a valid socket addr
+    pub fn add_peer(&mut self, addr: &str) -> bool {
+        match addr.to_socket_addrs() {
+            Ok(addr) => {
+                let addr = addr.as_slice();
+                assert_eq!(addr.len(), 1);
+                self.peers.push(addr[0]);
+                true
+            }
+            Err(_) => { false }
+        }
+    }
+
+    /// This is our Consensus Algorithm, it resolves conflicts
+    /// by replacing our chain with the longest one in the network.
+    /// Returns `true` if the chain is replaced
+    pub fn resolve_conflicts(&mut self) -> bool {
+        let mut ret = false;
+        let peers = self.peers.clone();
+        debug!("[Node {}] Resolve conflict with peers :{:?}", self.index, peers);
+        for peer in peers.iter() {
+            debug!("Connecting {}", peer);
+            match TcpStream::connect(peer) {
+                Ok(stream) => {
+                    debug!("[Node {}] Resolve conflict with peer :{:?}", self.index, peer);
+                    match self.resolve_conflict(stream) {
+                        Ok(flag) => { ret = ret || flag; }
+                        Err(e) => {
+                            error!("Error when communicating with {}: {}", peer, e);
+                        }
+                    }
+                }
+                Err(e) => { error!("Connection to {} failed: {}", peer, e) }
+            }
+        }
+        ret
+    }
+
+    fn resolve_conflict(&mut self, mut stream: TcpStream) -> Result<bool> {
+        serde_json::to_writer(stream.try_clone()?, &Message::Request)?;
+        stream.flush()?;
+        debug!("Request sent");
+        // There should be only one response, but we have to deserialize from a stream in this way
+        for response in Deserializer::from_reader(stream.try_clone()?).into_iter::<Message>() {
+            let response =
+                response.map_err(|e| failure::err_msg(format!("Deserializing error {}", e)))?;
+            if let Message::Response(blocks) = response {
+                debug!("Response received");
+                let new_chain = Blockchain::from_blocks(blocks);
+                if new_chain.len() > self.chain.len() && Blockchain::valid_chain(&new_chain) {
+                    self.chain = new_chain;
+                    return Ok(true);
+                } else {
+                    return Ok(false);
+                }
+            } else {
+                return Err(failure::err_msg("Invalid response"));
+            }
+        }
+        return Err(failure::err_msg("No response"));
+    }
 }
+

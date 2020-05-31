@@ -11,7 +11,7 @@ fn get_time() -> u128 {
     SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis()
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Block {
     index: u64,
     timestamp: u128,
@@ -49,6 +49,24 @@ impl Blockchain {
         };
         chain.new_block(100, "1".to_owned());
         chain
+    }
+
+    /// Creates a blockchain from given blocks
+    pub fn from_blocks(blocks: Vec<Block>) -> Self {
+        Blockchain {
+            current_transactions: vec![],
+            blocks,
+        }
+    }
+
+    /// Returns a copy of the blocks the chain owns
+    pub fn get_blocks(&self) -> Vec<Block> {
+        self.blocks.clone()
+    }
+
+    /// Returns the number of blocks in the blockchain, also referred to as its 'length'.
+    pub fn len(&self) -> usize {
+        self.blocks.len()
     }
 
     /// Creates a new Block and adds it to the chain
@@ -123,9 +141,10 @@ impl Blockchain {
 
         for i in 1..chain.blocks.len() {
             block = &chain.blocks[i];
-            debug!("last_block: {}", serde_json::to_string(&last_block).unwrap());
-            debug!("block: {}", serde_json::to_string(&block).unwrap());
-            debug!("");
+            trace!("validating chain ...");
+            trace!("last_block: {}", serde_json::to_string(&last_block).unwrap());
+            trace!("block: {}", serde_json::to_string(&block).unwrap());
+            trace!("");
             if last_block.get_hash() != block.previous_hash {
                 return false;
             }
@@ -139,7 +158,7 @@ impl Blockchain {
 }
 
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 struct Transaction {
     sender: String,
     recipient: String,
