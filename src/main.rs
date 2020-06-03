@@ -3,7 +3,7 @@ extern crate log;
 
 use clap::{App, AppSettings, Arg};
 use env_logger::Env;
-use nb::message::Message;
+use nb::message::{Request, Response};
 use nb::{Node, Result};
 use serde_json::Deserializer;
 use std::io::{stdin, stdout, Write};
@@ -38,7 +38,7 @@ fn main() {
 }
 
 fn run_node(addr: String) {
-    let node = Arc::new(Mutex::new(Node::new()));
+    let node = Arc::new(Mutex::new(Node::new(addr.clone())));
 
     let listener_node = node.clone();
     thread::spawn(move || handle_incoming_connections(listener_node, addr.clone()));
@@ -144,19 +144,25 @@ fn handle_incoming_connections(node: Arc<Mutex<Node>>, addr: String) -> Result<(
             Ok(mut stream) => {
                 debug!("waiting for request");
                 // There should be only one request, but we have to deserialize from a stream in this way
-                for request in Deserializer::from_reader(stream.try_clone()?).into_iter::<Message>()
+                for request in Deserializer::from_reader(stream.try_clone()?).into_iter::<Request>()
                 {
                     let request = request
                         .map_err(|e| failure::err_msg(format!("Deserializing error {}", e)))?;
                     debug!("request received {:?}", request);
-                    if let Message::Request = request {
-                        let response = Message::Response(node.lock().unwrap().get_blocks());
-                        serde_json::to_writer(&mut stream, &response)?;
-                        stream.flush()?;
-                        debug!("response sent {:?}", response);
-                    } else {
-                        error!("invalid request");
-                    }
+                    match request {
+                        Request::Hello(_peer_info) => {}
+                        Request::HowAreYou(_peer_info) => {
+                            let response = Response::MyBlocks(
+                                node.lock().unwrap().get_basic_info(),
+                                node.lock().unwrap().get_blocks(),
+                            );
+                            serde_json::to_writer(&mut stream, &response)?;
+                            stream.flush()?;
+                            debug!("response sent {:?}", response);
+                        }
+                        Request::NewTransaction(_peer_info, _transaction) => {}
+                        Request::NewBlock(_peer_info, _block) => {}
+                    };
                 }
             }
             Err(e) => error!("Connection failed: {}", e),
