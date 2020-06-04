@@ -91,18 +91,54 @@ impl Node {
     /// Adds a new peer. Returns false if `addr` is not a valid socket addr
     pub fn detect_peer(&mut self, addr: &str) -> bool {
         match addr.to_socket_addrs() {
-            Ok(_addr) => {
-                // todo: send Hello to addr to detect whether it's alive
-                false
+            Ok(addr) => {
+                let addr = addr.as_slice();
+                assert_eq!(addr.len(), 1);
+                match TcpStream::connect(addr[0]){
+                    Ok(stream) => {
+                        if let Ok(true) = self.say_hello(stream){
+                            true
+                        }else{
+                            false
+                        }
+                    }
+                    Err(e) => {
+                        error!("Error when communicating with {:?}: {}", addr, e);
+                        false
+                    }
+                }
             }
             Err(_) => false,
         }
     }
 
+    pub fn say_hello(&mut self, mut stream: TcpStream) -> Result<bool>{
+        serde_json::to_writer(
+            stream.try_clone()?,
+            &Request::Hello(self.basic_info.clone()),
+        )?;
+        stream.flush()?;
+        debug!("Request sent");
+        // There should be only one response, but we have to deserialize from a stream in this way
+        for response in Deserializer::from_reader(stream.try_clone()?).into_iter::<Response>() {
+            let response =
+                response.map_err(|e| failure::err_msg(format!("Deserializing error {}", e)))?;
+            return if let Response::Ack(peer_info) = response {
+                debug!("Ack for Hello received from: {:?}", peer_info);
+                Ok(self.add_peer(peer_info))
+            } else {
+                Err(failure::err_msg("Invalid response"))
+            };
+        }
+        return Err(failure::err_msg("No response"));
+    }
+
     pub fn add_peer(&mut self, peer: PeerInfo) -> bool{
         if self.peers.contains(&peer){
+            debug!("Peer already exists: {:?}", peer);
             false
         }else{
+            debug!("New peer added: {:?}", peer);
             self.peers.insert(peer);
             true
         }

@@ -151,7 +151,7 @@ fn handle_incoming_connections(node: Arc<Mutex<Node>>, addr: String) -> Result<(
                     debug!("request received {:?}", request);
                     // try to add a new peer from every request
                     let peer_info = request.get_peer_info();
-                    if node.lock().unwrap().detect_peer(peer_info.get_address()){
+                    if node.lock().unwrap().add_peer(peer_info.clone()){
                         info!("Add one new peer: {:?}", peer_info);
                     }
                     let response = match request {
