@@ -169,9 +169,10 @@ fn handle_incoming_connections(node: Arc<Mutex<Node>>, addr: String) -> Result<(
                         }
                         Request::HowAreYou(peer_info) => {
                             info!("Get HowAreYou from {:?}, will respond with all my blocks", peer_info);
+                            let node = node.lock().unwrap();
                             Response::MyBlocks(
-                                node.lock().unwrap().get_basic_info(),
-                                node.lock().unwrap().get_blocks(),
+                                node.get_basic_info(),
+                                node.get_blocks(),
                             )
                         }
                     };
