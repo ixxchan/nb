@@ -154,18 +154,20 @@ fn handle_incoming_connections(node: Arc<Mutex<Node>>, addr: String) -> Result<(
                     if node.lock().unwrap().add_peer(peer_info.clone()){
                         info!("Add one new peer: {:?}", peer_info);
                     }
+                    let my_info = node.lock().unwrap().get_basic_info();
                     let response = match request {
                         Request::Hello(peer_info) => {
                             info!("Get Hello from {:?}, simply ack it", peer_info);
-                            Response::Ack(node.lock().unwrap().get_basic_info())
+                            Response::Ack(my_info)
                         }
-                        Request::NewTransaction(_peer_info, transaction) => {
-                            node.lock().unwrap().add_new_transaction(transaction);
-                            Response::Ack(node.lock().unwrap().get_basic_info())
+                        Request::NewTransaction(peer_info, transaction) => {
+                            info!("Get NewTransaction from {:?}, add the transaction and ack it", peer_info);
+                            node.lock().unwrap().add_incoming_transaction(transaction);
+                            Response::Ack(my_info)
                         }
                         Request::NewBlock(_peer_info, _block) => {
                             // todo: add new block to node
-                            Response::Ack(node.lock().unwrap().get_basic_info())
+                            Response::Ack(my_info)
                         }
                         Request::HowAreYou(peer_info) => {
                             info!("Get HowAreYou from {:?}, will respond with all my blocks", peer_info);

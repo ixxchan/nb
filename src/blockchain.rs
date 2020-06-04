@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::io::stdout;
 use std::mem;
 use std::time::SystemTime;
+use uuid::Uuid;
 
 fn get_time() -> u128 {
     SystemTime::now()
@@ -87,21 +88,17 @@ impl Blockchain {
         self.last_block()
     }
 
-    /// Creates and then adds a new transaction
-    /// (which will go into the next mined block).
-    /// Returns the index of the Block that will hold this transaction
-    pub fn create_and_add_new_transaction(&mut self, sender: &str, recipient: &str, amount: i64) -> u64 {
-        self.add_new_transaction(Transaction {
-            sender: sender.to_owned(),
-            recipient: recipient.to_owned(),
-            amount,
-        });
-        (self.blocks.len() + 1) as u64
-    }
-
     /// Adds a new transaction to the list of transactions
-    pub fn add_new_transaction(&mut self, transaction: Transaction) {
-        self.current_transactions.push(transaction)
+    pub fn add_new_transaction(&mut self, transaction: &Transaction) -> bool{
+        // check whether it already exists
+        for t in &self.current_transactions{
+            if t.get_id() == transaction.get_id(){
+                return false
+            }
+        }
+        self.current_transactions.push(transaction.clone());
+        debug!("New transaction {:?} added", transaction.id);
+        true
     }
 
     /// Returns the last Block in the chain
@@ -170,9 +167,25 @@ impl Blockchain {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Transaction {
+    id: String,   // unique identifier for one transaction
     sender: String,
     recipient: String,
     amount: i64,
+}
+
+impl Transaction{
+    pub fn new(sender: &str, recipient: &str, amount: i64) -> Self{
+        Transaction{
+            id: Uuid::new_v4().to_string(),
+            sender: sender.to_owned(),
+            recipient: recipient.to_owned(),
+            amount
+        }
+    }
+
+    pub fn get_id(&self) -> &str{
+        self.id.as_str()
+    }
 }
 
 #[cfg(test)]
