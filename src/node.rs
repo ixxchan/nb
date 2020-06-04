@@ -1,25 +1,46 @@
 //! The blockchain node
 //! TODO: Now the nodes should get synced manually. Consider adding auto message broadcasting mechanism
-use crate::message::Message;
+use crate::message::{Request, Response};
 use crate::*;
+use serde::{Deserialize, Serialize};
 use serde_json::Deserializer;
 use std::io::Write;
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use uuid::Uuid;
 
+// self introduction for others to contact you
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PeerInfo {
+    id: String,
+    address: String,
+}
+
+impl PeerInfo {
+    pub fn new(address: String) -> Self {
+        PeerInfo {
+            id: Uuid::new_v4().to_string(),
+            address,
+        }
+    }
+}
+
 pub struct Node {
-    index: Uuid,
+    basic_info: PeerInfo,
     chain: Blockchain,
     peers: Vec<SocketAddr>,
 }
 
 impl Node {
-    pub fn new() -> Self {
+    pub fn new(addr: String) -> Self {
         Node {
-            index: Uuid::new_v4(),
+            basic_info: PeerInfo::new(addr),
             chain: Blockchain::new(),
             peers: Vec::new(),
         }
+    }
+
+    pub fn get_basic_info(&self) -> PeerInfo {
+        self.basic_info.clone()
     }
 
     /// Returns a copy of the blocks the node owns
@@ -34,12 +55,12 @@ impl Node {
         let last_hash = last_block.get_hash();
         // receive a reward for finding the proof.
         // The sender is "0" to signify that this node has mined a new coin.
-        self.new_transaction("0", &self.index.to_string(), 1);
+        self.new_transaction("0", &self.basic_info.id.clone(), 1);
 
         let block = self.chain.new_block(proof, last_hash);
         info!(
             "[Node {}] A new block {} is forged",
-            self.index,
+            self.basic_info.id,
             block.get_index()
         );
     }
@@ -49,7 +70,7 @@ impl Node {
         self.chain.new_transaction(sender, receiver, amount);
         info!(
             "[Node {}] A new transaction is added: {} -> {}, amount: {}",
-            self.index, sender, receiver, amount
+            self.basic_info.id, sender, receiver, amount
         );
     }
 
@@ -79,7 +100,7 @@ impl Node {
         let peers = self.peers.clone();
         debug!(
             "[Node {}] Resolve conflict with peers :{:?}",
-            self.index, peers
+            self.basic_info.id, peers
         );
         for peer in peers.iter() {
             debug!("Connecting {}", peer);
@@ -87,7 +108,7 @@ impl Node {
                 Ok(stream) => {
                     debug!(
                         "[Node {}] Resolve conflict with peer :{:?}",
-                        self.index, peer
+                        self.basic_info.id, peer
                     );
                     match self.resolve_conflict(stream) {
                         Ok(flag) => {
@@ -105,25 +126,28 @@ impl Node {
     }
 
     fn resolve_conflict(&mut self, mut stream: TcpStream) -> Result<bool> {
-        serde_json::to_writer(stream.try_clone()?, &Message::Request)?;
+        serde_json::to_writer(
+            stream.try_clone()?,
+            &Request::HowAreYou(self.basic_info.clone()),
+        )?;
         stream.flush()?;
         debug!("Request sent");
         // There should be only one response, but we have to deserialize from a stream in this way
-        for response in Deserializer::from_reader(stream.try_clone()?).into_iter::<Message>() {
+        for response in Deserializer::from_reader(stream.try_clone()?).into_iter::<Response>() {
             let response =
                 response.map_err(|e| failure::err_msg(format!("Deserializing error {}", e)))?;
-            if let Message::Response(blocks) = response {
+            return if let Response::MyBlocks(_, blocks) = response {
                 debug!("Response received");
                 let new_chain = Blockchain::from_blocks(blocks);
                 if new_chain.len() > self.chain.len() && Blockchain::valid_chain(&new_chain) {
                     self.chain = new_chain;
-                    return Ok(true);
+                    Ok(true)
                 } else {
-                    return Ok(false);
+                    Ok(false)
                 }
             } else {
-                return Err(failure::err_msg("Invalid response"));
-            }
+                Err(failure::err_msg("Invalid response"))
+            };
         }
         return Err(failure::err_msg("No response"));
     }

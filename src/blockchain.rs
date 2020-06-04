@@ -164,7 +164,7 @@ impl Blockchain {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-struct Transaction {
+pub struct Transaction {
     sender: String,
     recipient: String,
     amount: i64,
