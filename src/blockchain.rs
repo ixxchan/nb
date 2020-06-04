@@ -87,16 +87,21 @@ impl Blockchain {
         self.last_block()
     }
 
-    /// Adds a new transaction to the list of transactions
+    /// Creates and then adds a new transaction
     /// (which will go into the next mined block).
     /// Returns the index of the Block that will hold this transaction
-    pub fn new_transaction(&mut self, sender: &str, recipient: &str, amount: i64) -> u64 {
-        self.current_transactions.push(Transaction {
+    pub fn create_and_add_new_transaction(&mut self, sender: &str, recipient: &str, amount: i64) -> u64 {
+        self.add_new_transaction(Transaction {
             sender: sender.to_owned(),
             recipient: recipient.to_owned(),
             amount,
         });
         (self.blocks.len() + 1) as u64
+    }
+
+    /// Adds a new transaction to the list of transactions
+    pub fn add_new_transaction(&mut self, transaction: Transaction) {
+        self.current_transactions.push(transaction)
     }
 
     /// Returns the last Block in the chain
@@ -210,9 +215,9 @@ mod tests {
         assert!(Blockchain::valid_chain(&chain));
 
         // perform some normal operations
-        chain.new_transaction("0", "1", 1);
-        chain.new_transaction("1", "2", 2);
-        chain.new_transaction("2", "3", 3);
+        chain.create_and_add_new_transaction("0", "1", 1);
+        chain.create_and_add_new_transaction("1", "2", 2);
+        chain.create_and_add_new_transaction("2", "3", 3);
         chain.new_block(chain.run_pow(), chain.last_block().get_hash());
         assert!(Blockchain::valid_chain(&chain));
         chain.new_block(chain.run_pow(), chain.last_block().get_hash());

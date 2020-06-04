@@ -87,7 +87,7 @@ fn run_node(addr: String) {
                             continue;
                         }
                     };
-                    node.new_transaction(sender, receiver, amount);
+                    node.create_and_add_new_transaction(sender, receiver, amount);
                 }
                 MINE => {
                     node.mine();
@@ -101,7 +101,7 @@ fn run_node(addr: String) {
                         continue;
                     }
                     let peer = *args.get(1).unwrap();
-                    if false == node.add_peer(peer) {
+                    if false == node.detect_peer(peer) {
                         eprintln!("fail to add peer");
                     }
                 }
@@ -149,20 +149,35 @@ fn handle_incoming_connections(node: Arc<Mutex<Node>>, addr: String) -> Result<(
                     let request = request
                         .map_err(|e| failure::err_msg(format!("Deserializing error {}", e)))?;
                     debug!("request received {:?}", request);
-                    match request {
-                        Request::Hello(_peer_info) => {}
-                        Request::HowAreYou(_peer_info) => {
-                            let response = Response::MyBlocks(
+                    // try to add a new peer from every request
+                    let peer_info = request.get_peer_info();
+                    if node.lock().unwrap().detect_peer(peer_info.get_address()){
+                        info!("Add one new peer: {:?}", peer_info);
+                    }
+                    let response = match request {
+                        Request::Hello(peer_info) => {
+                            info!("Get Hello from {:?}, simply ack it", peer_info);
+                            Response::Ack(node.lock().unwrap().get_basic_info())
+                        }
+                        Request::NewTransaction(_peer_info, transaction) => {
+                            node.lock().unwrap().add_new_transaction(transaction);
+                            Response::Ack(node.lock().unwrap().get_basic_info())
+                        }
+                        Request::NewBlock(_peer_info, _block) => {
+                            // todo: add new block to node
+                            Response::Ack(node.lock().unwrap().get_basic_info())
+                        }
+                        Request::HowAreYou(peer_info) => {
+                            info!("Get HowAreYou from {:?}, will respond with all my blocks", peer_info);
+                            Response::MyBlocks(
                                 node.lock().unwrap().get_basic_info(),
                                 node.lock().unwrap().get_blocks(),
-                            );
-                            serde_json::to_writer(&mut stream, &response)?;
-                            stream.flush()?;
-                            debug!("response sent {:?}", response);
+                            )
                         }
-                        Request::NewTransaction(_peer_info, _transaction) => {}
-                        Request::NewBlock(_peer_info, _block) => {}
                     };
+                    serde_json::to_writer(&mut stream, &response)?;
+                    stream.flush()?;
+                    debug!("response sent {:?}", response);
                 }
             }
             Err(e) => error!("Connection failed: {}", e),

@@ -5,11 +5,12 @@ use crate::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Deserializer;
 use std::io::Write;
-use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
+use std::net::{TcpStream, ToSocketAddrs};
+use std::collections::HashSet;
 use uuid::Uuid;
 
 // self introduction for others to contact you
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Hash, Eq, PartialEq, Serialize, Deserialize, Debug, Clone)]
 pub struct PeerInfo {
     id: String,
     address: String,
@@ -22,12 +23,16 @@ impl PeerInfo {
             address,
         }
     }
+
+    pub fn get_address(&self) -> &str{
+        self.address.as_str()
+    }
 }
 
 pub struct Node {
     basic_info: PeerInfo,
     chain: Blockchain,
-    peers: Vec<SocketAddr>,
+    peers: HashSet<PeerInfo>,
 }
 
 impl Node {
@@ -35,7 +40,7 @@ impl Node {
         Node {
             basic_info: PeerInfo::new(addr),
             chain: Blockchain::new(),
-            peers: Vec::new(),
+            peers: HashSet::new(),
         }
     }
 
@@ -55,7 +60,7 @@ impl Node {
         let last_hash = last_block.get_hash();
         // receive a reward for finding the proof.
         // The sender is "0" to signify that this node has mined a new coin.
-        self.new_transaction("0", &self.basic_info.id.clone(), 1);
+        self.create_and_add_new_transaction("0", &self.basic_info.id.clone(), 1);
 
         let block = self.chain.new_block(proof, last_hash);
         info!(
@@ -66,12 +71,16 @@ impl Node {
     }
 
     /// Adds a new transaction
-    pub fn new_transaction(&mut self, sender: &str, receiver: &str, amount: i64) {
-        self.chain.new_transaction(sender, receiver, amount);
+    pub fn create_and_add_new_transaction(&mut self, sender: &str, receiver: &str, amount: i64) {
+        self.chain.create_and_add_new_transaction(sender, receiver, amount);
         info!(
             "[Node {}] A new transaction is added: {} -> {}, amount: {}",
             self.basic_info.id, sender, receiver, amount
         );
+    }
+
+    pub fn add_new_transaction(&mut self, transaction: Transaction){
+        self.chain.add_new_transaction(transaction)
     }
 
     /// Displays the full blockchain
@@ -80,15 +89,22 @@ impl Node {
     }
 
     /// Adds a new peer. Returns false if `addr` is not a valid socket addr
-    pub fn add_peer(&mut self, addr: &str) -> bool {
+    pub fn detect_peer(&mut self, addr: &str) -> bool {
         match addr.to_socket_addrs() {
-            Ok(addr) => {
-                let addr = addr.as_slice();
-                assert_eq!(addr.len(), 1);
-                self.peers.push(addr[0]);
-                true
+            Ok(_addr) => {
+                // todo: send Hello to addr to detect whether it's alive
+                false
             }
             Err(_) => false,
+        }
+    }
+
+    pub fn add_peer(&mut self, peer: PeerInfo) -> bool{
+        if self.peers.contains(&peer){
+            false
+        }else{
+            self.peers.insert(peer);
+            true
         }
     }
 
@@ -103,8 +119,9 @@ impl Node {
             self.basic_info.id, peers
         );
         for peer in peers.iter() {
-            debug!("Connecting {}", peer);
-            match TcpStream::connect(peer) {
+            debug!("Connecting {:?}", peer);
+            let socket_address = peer.get_address().to_socket_addrs().unwrap().as_slice()[0];
+            match TcpStream::connect(socket_address) {
                 Ok(stream) => {
                     debug!(
                         "[Node {}] Resolve conflict with peer :{:?}",
@@ -115,11 +132,11 @@ impl Node {
                             ret = ret || flag;
                         }
                         Err(e) => {
-                            error!("Error when communicating with {}: {}", peer, e);
+                            error!("Error when communicating with {:?}: {}", peer, e);
                         }
                     }
                 }
-                Err(e) => error!("Connection to {} failed: {}", peer, e),
+                Err(e) => error!("Connection to {:?} failed: {}", peer, e),
             }
         }
         ret
