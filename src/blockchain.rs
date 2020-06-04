@@ -167,7 +167,8 @@ impl Blockchain {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Transaction {
-    id: String, // unique identifier for one transaction
+    id: String,
+    // unique identifier for one transaction
     sender: String,
     recipient: String,
     amount: i64,
@@ -191,7 +192,7 @@ impl Transaction {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use env_logger::Env;
+    //    use env_logger::Env;
 
     #[test]
     fn test_pow() {
@@ -210,11 +211,9 @@ mod tests {
         assert!(Blockchain::valid_chain(&chain));
 
         // play with the genesis block
-        chain.blocks[0].transactions.push(Transaction {
-            sender: "good".to_owned(),
-            recipient: "evil".to_owned(),
-            amount: 100,
-        });
+        chain.blocks[0]
+            .transactions
+            .push(Transaction::new("good", "evil", 100));
         assert!(!Blockchain::valid_chain(&chain));
         chain.blocks[0].transactions.pop();
         assert!(Blockchain::valid_chain(&chain));
@@ -228,20 +227,18 @@ mod tests {
         assert!(Blockchain::valid_chain(&chain));
 
         // perform some normal operations
-        chain.create_and_add_new_transaction("0", "1", 1);
-        chain.create_and_add_new_transaction("1", "2", 2);
-        chain.create_and_add_new_transaction("2", "3", 3);
+        chain.add_new_transaction(&Transaction::new("0", "1", 1));
+        chain.add_new_transaction(&Transaction::new("1", "2", 2));
+        chain.add_new_transaction(&Transaction::new("2", "3", 3));
         chain.new_block(chain.run_pow(), chain.last_block().get_hash());
         assert!(Blockchain::valid_chain(&chain));
         chain.new_block(chain.run_pow(), chain.last_block().get_hash());
         assert!(Blockchain::valid_chain(&chain));
 
         // tamper an intermediate block
-        chain.blocks[1].transactions.push(Transaction {
-            sender: "good".to_owned(),
-            recipient: "evil".to_owned(),
-            amount: 100,
-        });
+        chain.blocks[1]
+            .transactions
+            .push(Transaction::new("good", "evil", 100));
         assert!(!Blockchain::valid_chain(&chain));
         chain.blocks[1].transactions.pop();
         assert!(Blockchain::valid_chain(&chain));
@@ -257,11 +254,9 @@ mod tests {
         assert!(Blockchain::valid_chain(&chain));
 
         // play with the genesis block again
-        chain.blocks[0].transactions.push(Transaction {
-            sender: "good".to_owned(),
-            recipient: "evil".to_owned(),
-            amount: 100,
-        });
+        chain.blocks[0]
+            .transactions
+            .push(Transaction::new("good", "evil", 100));
         assert!(!Blockchain::valid_chain(&chain));
     }
 }
