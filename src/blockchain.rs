@@ -89,11 +89,11 @@ impl Blockchain {
     }
 
     /// Adds a new transaction to the list of transactions
-    pub fn add_new_transaction(&mut self, transaction: &Transaction) -> bool{
+    pub fn add_new_transaction(&mut self, transaction: &Transaction) -> bool {
         // check whether it already exists
-        for t in &self.current_transactions{
-            if t.get_id() == transaction.get_id(){
-                return false
+        for t in &self.current_transactions {
+            if t.get_id() == transaction.get_id() {
+                return false;
             }
         }
         self.current_transactions.push(transaction.clone());
@@ -167,23 +167,23 @@ impl Blockchain {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Transaction {
-    id: String,   // unique identifier for one transaction
+    id: String, // unique identifier for one transaction
     sender: String,
     recipient: String,
     amount: i64,
 }
 
-impl Transaction{
-    pub fn new(sender: &str, recipient: &str, amount: i64) -> Self{
-        Transaction{
+impl Transaction {
+    pub fn new(sender: &str, recipient: &str, amount: i64) -> Self {
+        Transaction {
             id: Uuid::new_v4().to_string(),
             sender: sender.to_owned(),
             recipient: recipient.to_owned(),
-            amount
+            amount,
         }
     }
 
-    pub fn get_id(&self) -> &str{
+    pub fn get_id(&self) -> &str {
         self.id.as_str()
     }
 }

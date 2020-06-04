@@ -4,9 +4,9 @@ use crate::message::{Request, Response};
 use crate::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Deserializer;
+use std::collections::HashSet;
 use std::io::Write;
 use std::net::{TcpStream, ToSocketAddrs};
-use std::collections::HashSet;
 use uuid::Uuid;
 
 // self introduction for others to contact you
@@ -24,7 +24,7 @@ impl PeerInfo {
         }
     }
 
-    pub fn get_address(&self) -> &str{
+    pub fn get_address(&self) -> &str {
         self.address.as_str()
     }
 }
@@ -73,9 +73,9 @@ impl Node {
     /// Adds a new transaction
     pub fn create_and_add_new_transaction(&mut self, sender: &str, receiver: &str, amount: i64) {
         let transaction = Transaction::new(sender, receiver, amount);
-        if !self.chain.add_new_transaction(&transaction){
+        if !self.chain.add_new_transaction(&transaction) {
             info!("Transaction already exists");
-            return
+            return;
         }
         info!(
             "[Node {}] A new transaction is added: {} -> {}, amount: {}",
@@ -87,9 +87,9 @@ impl Node {
     // Take an incoming transaction and try to add it
     // If it already exists, drop it and do nothing
     // Else, add and broadcast it
-    pub fn add_incoming_transaction(&mut self, transaction: Transaction){
-        if !self.chain.add_new_transaction(&transaction){
-            return
+    pub fn add_incoming_transaction(&mut self, transaction: Transaction) {
+        if !self.chain.add_new_transaction(&transaction) {
+            return;
         }
         // TODO: how to avoid deadlock when broadcasting?
         // self.broadcast_transaction(transaction)
@@ -99,7 +99,9 @@ impl Node {
         let peers = self.peers.clone();
         debug!(
             "[Node {}] broadcasts transaction {:?} to peers :{:?}",
-            self.basic_info.id, transaction.get_id(), peers
+            self.basic_info.id,
+            transaction.get_id(),
+            peers
         );
         for peer in peers.iter() {
             debug!("Connecting {:?}", peer);
@@ -108,12 +110,16 @@ impl Node {
                 Ok(stream) => {
                     let _ = self.send_transaction(stream, transaction.clone());
                 }
-                Err(e) => debug!("Connection to {:?} failed: {}", peer, e)
+                Err(e) => debug!("Connection to {:?} failed: {}", peer, e),
             }
         }
     }
 
-    pub fn send_transaction(&self, mut stream: TcpStream, transaction: Transaction) -> Result<bool>{
+    pub fn send_transaction(
+        &self,
+        mut stream: TcpStream,
+        transaction: Transaction,
+    ) -> Result<bool> {
         serde_json::to_writer(
             stream.try_clone()?,
             &Request::NewTransaction(self.basic_info.clone(), transaction),
@@ -145,11 +151,11 @@ impl Node {
             Ok(addr) => {
                 let addr = addr.as_slice();
                 assert_eq!(addr.len(), 1);
-                match TcpStream::connect(addr[0]){
+                match TcpStream::connect(addr[0]) {
                     Ok(stream) => {
-                        if let Ok(true) = self.say_hello(stream){
+                        if let Ok(true) = self.say_hello(stream) {
                             true
-                        }else{
+                        } else {
                             false
                         }
                     }
@@ -163,7 +169,7 @@ impl Node {
         }
     }
 
-    pub fn say_hello(&mut self, mut stream: TcpStream) -> Result<bool>{
+    pub fn say_hello(&mut self, mut stream: TcpStream) -> Result<bool> {
         serde_json::to_writer(
             stream.try_clone()?,
             &Request::Hello(self.basic_info.clone()),
@@ -184,11 +190,11 @@ impl Node {
         return Err(failure::err_msg("No response"));
     }
 
-    pub fn add_peer(&mut self, peer: PeerInfo) -> bool{
-        if self.peers.contains(&peer){
+    pub fn add_peer(&mut self, peer: PeerInfo) -> bool {
+        if self.peers.contains(&peer) {
             debug!("Peer already exists: {:?}", peer);
             false
-        }else{
+        } else {
             debug!("New peer added: {:?}", peer);
             self.peers.insert(peer);
             true

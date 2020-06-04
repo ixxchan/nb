@@ -151,7 +151,7 @@ fn handle_incoming_connections(node: Arc<Mutex<Node>>, addr: String) -> Result<(
                     debug!("request received {:?}", request);
                     // try to add a new peer from every request
                     let peer_info = request.get_peer_info();
-                    if node.lock().unwrap().add_peer(peer_info.clone()){
+                    if node.lock().unwrap().add_peer(peer_info.clone()) {
                         info!("Add one new peer: {:?}", peer_info);
                     }
                     let my_info = node.lock().unwrap().get_basic_info();
@@ -161,7 +161,10 @@ fn handle_incoming_connections(node: Arc<Mutex<Node>>, addr: String) -> Result<(
                             Response::Ack(my_info)
                         }
                         Request::NewTransaction(peer_info, transaction) => {
-                            info!("Get NewTransaction from {:?}, add the transaction and ack it", peer_info);
+                            info!(
+                                "Get NewTransaction from {:?}, add the transaction and ack it",
+                                peer_info
+                            );
                             node.lock().unwrap().add_incoming_transaction(transaction);
                             Response::Ack(my_info)
                         }
@@ -170,12 +173,12 @@ fn handle_incoming_connections(node: Arc<Mutex<Node>>, addr: String) -> Result<(
                             Response::Ack(my_info)
                         }
                         Request::HowAreYou(peer_info) => {
-                            info!("Get HowAreYou from {:?}, will respond with all my blocks", peer_info);
+                            info!(
+                                "Get HowAreYou from {:?}, will respond with all my blocks",
+                                peer_info
+                            );
                             let node = node.lock().unwrap();
-                            Response::MyBlocks(
-                                node.get_basic_info(),
-                                node.get_blocks(),
-                            )
+                            Response::MyBlocks(node.get_basic_info(), node.get_blocks())
                         }
                     };
                     serde_json::to_writer(&mut stream, &response)?;

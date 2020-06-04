@@ -9,13 +9,13 @@ pub enum Request {
     NewBlock(PeerInfo, Block),
 }
 
-impl Request{
+impl Request {
     pub fn get_peer_info(&self) -> &PeerInfo {
         match self {
-            Request::Hello(p) | Request::HowAreYou(p) |
-            Request::NewTransaction(p, _) | Request::NewBlock(p, _) =>{
-                p
-            }
+            Request::Hello(p)
+            | Request::HowAreYou(p)
+            | Request::NewTransaction(p, _)
+            | Request::NewBlock(p, _) => p,
         }
     }
 }
