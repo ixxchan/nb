@@ -10,6 +10,7 @@ use std::io::{stdin, stdout, Write};
 use std::net::TcpListener;
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::time::Duration;
 
 fn main() {
     let matches = App::new("nb")
@@ -201,5 +202,6 @@ fn handle_incoming_connections(node: Arc<Mutex<Node>>, addr: String) -> Result<(
 fn handle_broadcast(node: Arc<Mutex<Node>>) {
     loop {
         node.lock().unwrap().try_fetch_one_broadcast();
+        thread::sleep(Duration::from_secs(3));
     }
 }
