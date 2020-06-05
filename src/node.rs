@@ -30,13 +30,16 @@ impl PeerInfo {
     }
 }
 
+type ResponseHandler = fn(&Response) -> Result<bool>;
+
 /// TODO: add consensus protocol specification
+/// TODO: mpsc is not needed, since Arc<Mutex<Node>> is used
 pub struct Node {
     basic_info: PeerInfo,
     chain: Blockchain,
     peers: HashSet<PeerInfo>,
-    broadcast_channel_in: Sender<(Request, fn(&Response) -> Result<bool>)>,
-    broadcast_channel_out: Receiver<(Request, fn(&Response) -> Result<bool>)>,
+    broadcast_channel_in: Sender<(Request, ResponseHandler)>,
+    broadcast_channel_out: Receiver<(Request, ResponseHandler)>,
 }
 
 impl Node {
@@ -167,11 +170,7 @@ impl Node {
     }
 
     // TODO: what does the return value mean?
-    fn broadcast_request(
-        &self,
-        req: &Request,
-        response_handler: fn(&Response) -> Result<bool>,
-    ) -> Result<bool> {
+    fn broadcast_request(&self, req: &Request, response_handler: ResponseHandler) -> Result<bool> {
         let peers = self.peers.clone();
         debug!("broadcasts request {:?} to peers :{:?}", req, peers);
         for peer in peers.iter() {
