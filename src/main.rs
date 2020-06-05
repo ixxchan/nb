@@ -172,12 +172,13 @@ fn handle_incoming_connections(node: Arc<Mutex<Node>>, addr: String) -> Result<(
                             // todo: add new block to node
                             Response::Ack(my_info)
                         }
-                        Request::HowAreYou(peer_info) => {
+                        Request::HowAreYou(peer_info, peer_blocks) => {
                             info!(
                                 "Get HowAreYou from {:?}, will respond with all my blocks",
                                 peer_info
                             );
-                            let node = node.lock().unwrap();
+                            let mut node = node.lock().unwrap();
+                            node.update_chain(peer_blocks);
                             Response::MyBlocks(node.get_basic_info(), node.get_blocks())
                         }
                     };

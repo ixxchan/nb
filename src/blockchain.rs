@@ -109,6 +109,10 @@ impl Blockchain {
         true
     }
 
+    pub fn get_current_transactions(&self) -> Vec<Transaction> {
+        self.current_transactions.clone()
+    }
+
     /// Returns the last Block in the chain
     pub fn last_block(&self) -> &Block {
         &self.blocks.last().unwrap()

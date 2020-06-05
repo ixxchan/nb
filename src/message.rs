@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug)]
 pub enum Request {
     Hello(PeerInfo),
-    HowAreYou(PeerInfo),
+    HowAreYou(PeerInfo, Vec<Block>),
     NewTransaction(PeerInfo, Transaction),
     NewBlock(PeerInfo, Block),
 }
@@ -13,7 +13,7 @@ impl Request {
     pub fn get_peer_info(&self) -> &PeerInfo {
         match self {
             Request::Hello(p)
-            | Request::HowAreYou(p)
+            | Request::HowAreYou(p, _)
             | Request::NewTransaction(p, _)
             | Request::NewBlock(p, _) => p,
         }

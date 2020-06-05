@@ -64,10 +64,13 @@ impl Node {
 
         let block = self.chain.new_block(proof, last_hash);
         info!(
-            "[Node {}] A new block {} is forged",
+            "[Node {}] A new block {} is forged, will broadcast it to all peers",
             self.basic_info.id,
             block.get_index()
         );
+        if self.resolve_conflicts() {
+            info!("Sorry but other peers have a longer chain, so this new block is dropped :(")
+        }
     }
 
     /// Adds a new transaction
@@ -201,6 +204,24 @@ impl Node {
         }
     }
 
+    pub fn update_chain(&mut self, new_blocks: Vec<Block>) -> bool {
+        if new_blocks.len() <= self.chain.len() {
+            return false;
+        }
+        let mut new_chain = Blockchain::from_blocks(new_blocks);
+        if !Blockchain::valid_chain(&new_chain) {
+            return false;
+        }
+        // add current transactions that are not on the chain yet
+        // otherwise, these transaction would be lost!
+        for t in self.chain.get_current_transactions() {
+            new_chain.add_new_transaction(&t);
+        }
+        self.chain = new_chain;
+        // TODO: when chain updated, the node should broadcast it to all peers
+        true
+    }
+
     /// This is our Consensus Algorithm, it resolves conflicts
     /// by replacing our chain with the longest one in the network.
     /// Returns `true` if the chain is replaced
@@ -238,7 +259,7 @@ impl Node {
     fn resolve_conflict(&mut self, mut stream: TcpStream) -> Result<bool> {
         serde_json::to_writer(
             stream.try_clone()?,
-            &Request::HowAreYou(self.basic_info.clone()),
+            &Request::HowAreYou(self.basic_info.clone(), self.get_blocks()),
         )?;
         stream.flush()?;
         debug!("Request sent");
@@ -248,13 +269,7 @@ impl Node {
                 response.map_err(|e| failure::err_msg(format!("Deserializing error {}", e)))?;
             return if let Response::MyBlocks(_, blocks) = response {
                 debug!("Response received");
-                let new_chain = Blockchain::from_blocks(blocks);
-                if new_chain.len() > self.chain.len() && Blockchain::valid_chain(&new_chain) {
-                    self.chain = new_chain;
-                    Ok(true)
-                } else {
-                    Ok(false)
-                }
+                Ok(self.update_chain(blocks))
             } else {
                 Err(failure::err_msg("Invalid response"))
             };
