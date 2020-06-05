@@ -109,6 +109,30 @@ impl Blockchain {
         true
     }
 
+    pub fn add_new_block(&mut self, block: &Block) -> bool {
+        let (block_idx, current_len) = (block.get_index(), self.blocks.len() as u64);
+        if block_idx <= current_len {
+            debug!("The incoming block is too old, so it is dropped");
+            false
+        } else if block_idx == current_len + 1 {
+            let last_block = self.last_block();
+            if last_block.get_hash() != block.previous_hash
+                || !Blockchain::valid_proof(last_block.proof, block.proof)
+            {
+                debug!("The incoming block is not valid");
+                false
+            } else {
+                // okay, now this block looks good to us
+                debug!("The incoming block is accepted :)");
+                self.add_new_block(block);
+                true
+            }
+        } else {
+            debug!("The incoming block is too new for us, we need to resolve conflicts");
+            false
+        }
+    }
+
     pub fn get_current_transactions(&self) -> Vec<Transaction> {
         self.current_transactions.clone()
     }

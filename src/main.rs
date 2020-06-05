@@ -92,6 +92,7 @@ fn run_node(addr: String) {
                 }
                 MINE => {
                     node.mine();
+                    debug!("Mined!!!")
                 }
                 SEE_BLOCKCHAIN => {
                     node.display();
@@ -143,7 +144,6 @@ fn handle_incoming_connections(node: Arc<Mutex<Node>>, addr: String) -> Result<(
         debug!("new incoming connection");
         match stream {
             Ok(mut stream) => {
-                debug!("waiting for request");
                 // There should be only one request, but we have to deserialize from a stream in this way
                 for request in Deserializer::from_reader(stream.try_clone()?).into_iter::<Request>()
                 {
@@ -166,20 +166,25 @@ fn handle_incoming_connections(node: Arc<Mutex<Node>>, addr: String) -> Result<(
                                 "Get NewTransaction from {:?}, add the transaction and ack it",
                                 peer_info
                             );
-                            node.lock().unwrap().add_incoming_transaction(transaction);
+                            node.lock()
+                                .unwrap()
+                                .handle_incoming_transaction(transaction);
                             Response::Ack(my_info)
                         }
-                        Request::NewBlock(_peer_info, _block) => {
-                            // todo: add new block to node
+                        Request::NewBlock(peer_info, new_block) => {
+                            info!(
+                                "Get NewBlock from {:?}, validate it and possibly add it to our chain",
+                                peer_info
+                            );
+                            node.lock().unwrap().handle_incoming_block(new_block);
                             Response::Ack(my_info)
                         }
-                        Request::HowAreYou(peer_info, peer_blocks) => {
+                        Request::HowAreYou(peer_info) => {
                             info!(
                                 "Get HowAreYou from {:?}, will respond with all my blocks",
                                 peer_info
                             );
-                            let mut node = node.lock().unwrap();
-                            node.update_chain(peer_blocks);
+                            let node = node.lock().unwrap();
                             Response::MyBlocks(node.get_basic_info(), node.get_blocks())
                         }
                     };

@@ -74,9 +74,8 @@ impl Node {
             self.basic_info.id,
             block.get_index()
         );
-        if self.resolve_conflicts() {
-            info!("Sorry but other peers have a longer chain, so this new block is dropped :(")
-        }
+        // broadcast the newly mined block
+        self.async_broadcast_latest_block();
     }
 
     /// Adds a new transaction
@@ -96,12 +95,26 @@ impl Node {
     // Take an incoming transaction and try to add it
     // If it already exists, drop it and do nothing
     // Else, add and broadcast it
-    pub fn add_incoming_transaction(&mut self, transaction: Transaction) {
+    pub fn handle_incoming_transaction(&mut self, transaction: Transaction) {
         if !self.chain.add_new_transaction(&transaction) {
             debug!("Redundant incoming transaction, simply drop it");
             return;
         }
         self.async_broadcast_transaction(transaction);
+    }
+
+    // When a new block comes, check its index:
+    // if its index is lower than or equal to that of out latest block, drop it and do nothing
+    // if its index is exactly one plus our latest block's index and its previous block is our
+    //      latest block, then append it to the end of my chain
+    // else, do nothing to this block but then we need to resolve conflicts
+    pub fn handle_incoming_block(&mut self, block: Block) {
+        if self.chain.add_new_block(&block) {
+            // broadcast this good news to my friends~
+            self.async_broadcast_latest_block();
+        } else {
+            // TODO: asynchronously resolve conflicts
+        };
     }
 
     pub fn async_broadcast_transaction(&self, transaction: Transaction) {
@@ -119,6 +132,25 @@ impl Node {
                 },
             ))
             .unwrap();
+    }
+
+    pub fn async_broadcast_block(&self, block: Block) {
+        self.broadcast_channel_in
+            .send((Request::NewBlock(self.get_basic_info(), block), |resp| {
+                if let Response::Ack(_) = resp {
+                    Ok(true)
+                } else {
+                    Err(failure::err_msg("Invalid response type"))
+                }
+            }))
+            .unwrap();
+    }
+
+    pub fn async_broadcast_latest_block(&self) {
+        match self.get_blocks().last() {
+            Some(block) => self.async_broadcast_block(block.to_owned()),
+            None => debug!("No block to broadcast"),
+        }
     }
 
     pub fn try_fetch_one_broadcast(&self) {
@@ -241,7 +273,8 @@ impl Node {
             new_chain.add_new_transaction(&t);
         }
         self.chain = new_chain;
-        // TODO: when chain updated, the node should broadcast it to all peers
+        // broadcast only the latest block
+        self.async_broadcast_latest_block();
         true
     }
 
@@ -282,7 +315,7 @@ impl Node {
     fn resolve_conflict(&mut self, mut stream: TcpStream) -> Result<bool> {
         serde_json::to_writer(
             stream.try_clone()?,
-            &Request::HowAreYou(self.basic_info.clone(), self.get_blocks()),
+            &Request::HowAreYou(self.basic_info.clone()),
         )?;
         stream.flush()?;
         debug!("Request sent");
