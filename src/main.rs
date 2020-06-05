@@ -42,7 +42,14 @@ fn run_node(addr: String) {
     let node = Arc::new(Mutex::new(Node::new(addr.clone())));
 
     let listener_node = node.clone();
-    thread::spawn(move || handle_incoming_connections(listener_node, addr.clone()));
+    thread::spawn(move ||
+        {
+            let node = listener_node;
+            let addr = addr.clone();
+            loop {
+                let _result = handle_incoming_connections(node.clone(), addr.clone());
+            }
+        });
     let broadcast_node = node.clone();
     thread::spawn(move || handle_broadcast(broadcast_node));
     loop {
