@@ -155,9 +155,11 @@ impl Node {
     }
 
     pub fn try_fetch_one_broadcast(&self) {
+        debug!("try_fetch_one_broadcast...");
         let recv_res = self.broadcast_channel_out.try_recv();
         match recv_res {
             Ok((req, handler)) => {
+                debug!("broadcast fetched");
                 let _ = self.broadcast_request(&req, handler);
             }
             Err(_) => {}
@@ -171,10 +173,7 @@ impl Node {
         response_handler: fn(&Response) -> Result<bool>,
     ) -> Result<bool> {
         let peers = self.peers.clone();
-        debug!(
-            "[Node {}] broadcasts request {:?} to peers :{:?}",
-            self.basic_info.id, req, peers
-        );
+        debug!("broadcasts request {:?} to peers :{:?}", req, peers);
         for peer in peers.iter() {
             debug!("Connecting {:?}", peer);
             let socket_address = peer.get_address().to_socket_addrs().unwrap().as_slice()[0];
@@ -182,13 +181,17 @@ impl Node {
                 Ok(mut stream) => {
                     serde_json::to_writer(stream.try_clone()?, req)?;
                     stream.flush()?;
+                    debug!("Request broadcast, waiting for Response");
                     for response in
                         Deserializer::from_reader(stream.try_clone()?).into_iter::<Response>()
                     {
+                        debug!("Response received {:?}", response);
                         let response = response
                             .map_err(|e| failure::err_msg(format!("Deserializing error {}", e)))?;
                         let _result = response_handler(&response);
+                        break;
                     }
+                    debug!("Response handled");
                     // Err(failure::err_msg("No response"))
                 }
                 Err(e) => {
@@ -196,8 +199,10 @@ impl Node {
                     // Err(failure::err_msg("Failed to connect"))
                 }
             };
+            debug!("broadcast to one peer finished");
         }
         // Err(failure::err_msg("No peer to connect"))
+        debug!("broadcast finished");
         Ok(true)
     }
 
@@ -288,19 +293,13 @@ impl Node {
     pub fn resolve_conflicts(&mut self) -> bool {
         let mut ret = false;
         let peers = self.peers.clone();
-        debug!(
-            "[Node {}] Resolve conflict with peers :{:?}",
-            self.basic_info.id, peers
-        );
+        debug!("Resolve conflict with peers :{:?}", peers);
         for peer in peers.iter() {
             debug!("Connecting {:?}", peer);
             let socket_address = peer.get_address().to_socket_addrs().unwrap().as_slice()[0];
             match TcpStream::connect(socket_address) {
                 Ok(stream) => {
-                    debug!(
-                        "[Node {}] Resolve conflict with peer :{:?}",
-                        self.basic_info.id, peer
-                    );
+                    debug!("Resolve conflict with peer :{:?}", peer);
                     match self.resolve_conflict(stream) {
                         Ok(flag) => {
                             ret = ret || flag;

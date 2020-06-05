@@ -189,6 +189,7 @@ fn handle_incoming_connections(node: Arc<Mutex<Node>>, addr: String) -> Result<(
                     serde_json::to_writer(&mut stream, &response)?;
                     stream.flush()?;
                     debug!("response sent {:?}", response);
+                    break;
                 }
             }
             Err(e) => error!("Connection failed: {}", e),
