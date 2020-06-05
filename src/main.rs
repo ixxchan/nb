@@ -42,14 +42,13 @@ fn run_node(addr: String) {
     let node = Arc::new(Mutex::new(Node::new(addr.clone())));
 
     let listener_node = node.clone();
-    thread::spawn(move ||
-        {
-            let node = listener_node;
-            let addr = addr.clone();
-            loop {
-                let _result = handle_incoming_connections(node.clone(), addr.clone());
-            }
-        });
+    thread::spawn(move || {
+        let node = listener_node;
+        let addr = addr.clone();
+        loop {
+            let _result = handle_incoming_connections(node.clone(), addr.clone());
+        }
+    });
     let broadcast_node = node.clone();
     thread::spawn(move || handle_broadcast(broadcast_node));
     loop {
@@ -111,7 +110,7 @@ fn run_node(addr: String) {
                         continue;
                     }
                     let peer = *args.get(1).unwrap();
-                    if false == node.detect_peer(peer) {
+                    if false == node.greet_and_add_peer(peer) {
                         eprintln!("fail to add peer");
                     }
                 }

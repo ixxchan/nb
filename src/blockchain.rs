@@ -25,10 +25,12 @@ pub struct Block {
 }
 
 impl Block {
+    /// Returns the index of the Block in the chain.
     pub fn get_index(&self) -> u64 {
         self.index
     }
-    /// Hashes a Block
+
+    /// Hashes a Block.
     pub fn get_hash(&self) -> String {
         let block_string = serde_json::to_string(self).unwrap();
         let mut hasher = Sha256::new();
@@ -44,17 +46,17 @@ pub struct Blockchain {
 }
 
 impl Blockchain {
-    /// Creates a new Blockchain node
+    /// Creates a new Blockchain with only the genesis block.
     pub fn new() -> Self {
         let mut chain = Blockchain {
             current_transactions: vec![],
             blocks: vec![],
         };
-        chain.new_block(100, "1".to_owned());
+        chain.create_new_block(100, "1".to_owned());
         chain
     }
 
-    /// Creates a blockchain from given blocks
+    /// Creates a blockchain from given blocks.
     pub fn from_blocks(blocks: Vec<Block>) -> Self {
         Blockchain {
             current_transactions: vec![],
@@ -62,7 +64,7 @@ impl Blockchain {
         }
     }
 
-    /// Returns a copy of the blocks the chain owns
+    /// Returns a copy of the blocks the chain owns.
     pub fn get_blocks(&self) -> Vec<Block> {
         self.blocks.clone()
     }
@@ -72,23 +74,7 @@ impl Blockchain {
         self.blocks.len()
     }
 
-    /// Creates a new Block and adds it to the chain
-    pub fn new_block(&mut self, proof: u64, previous_hash: String) -> &Block {
-        let transactions = mem::replace(&mut self.current_transactions, Vec::new());
-
-        let block = Block {
-            index: (self.blocks.len() + 1) as u64,
-            timestamp: get_time(),
-            proof,
-            transactions,
-            previous_hash,
-        };
-
-        self.blocks.push(block);
-        self.last_block()
-    }
-
-    /// Adds a new transaction to the list of transactions
+    /// Adds a new transaction to the list of transactions.
     pub fn add_new_transaction(&mut self, transaction: &Transaction) -> bool {
         // check whether it already exists in current transactions
         for t in &self.current_transactions {
@@ -109,6 +95,23 @@ impl Blockchain {
         true
     }
 
+    /// Creates a new Block containing current transactions and adds it to the chain.
+    pub fn create_new_block(&mut self, proof: u64, previous_hash: String) -> &Block {
+        let transactions = mem::replace(&mut self.current_transactions, Vec::new());
+
+        let block = Block {
+            index: (self.blocks.len() + 1) as u64,
+            timestamp: get_time(),
+            proof,
+            transactions,
+            previous_hash,
+        };
+
+        self.blocks.push(block);
+        self.last_block()
+    }
+
+    /// Adds a given block to the chain. Returns `false` if the new block is invalid.
     pub fn add_new_block(&mut self, block: &Block) -> bool {
         let (block_idx, current_len) = (block.get_index(), self.blocks.len() as u64);
         if block_idx <= current_len {
@@ -133,16 +136,17 @@ impl Blockchain {
         }
     }
 
+    /// Returns a copy of current transactions.
     pub fn get_current_transactions(&self) -> Vec<Transaction> {
         self.current_transactions.clone()
     }
 
-    /// Returns the last Block in the chain
+    /// Returns the last Block in the chain.
     pub fn last_block(&self) -> &Block {
         &self.blocks.last().unwrap()
     }
 
-    /// Proof of Work algorithm
+    /// Proof of Work algorithm.
     pub fn proof_of_work(last_proof: u64) -> u64 {
         let mut proof = 0;
         while Blockchain::valid_proof(last_proof, proof) == false {
@@ -151,7 +155,7 @@ impl Blockchain {
         proof
     }
 
-    /// Run pow in the chain
+    /// Run PoW in the chain.
     pub fn run_pow(&self) -> u64 {
         Blockchain::proof_of_work(self.last_block().proof)
     }
@@ -163,6 +167,7 @@ impl Blockchain {
         return &hasher.result_str()[0..4] == "0000";
     }
 
+    /// Displays the full blockchain.
     pub fn display(&self) {
         serde_json::to_writer_pretty(stdout(), &self.blocks).expect("fail to display blockchain");
     }
@@ -266,9 +271,9 @@ mod tests {
         chain.add_new_transaction(&Transaction::new("0", "1", 1));
         chain.add_new_transaction(&Transaction::new("1", "2", 2));
         chain.add_new_transaction(&Transaction::new("2", "3", 3));
-        chain.new_block(chain.run_pow(), chain.last_block().get_hash());
+        chain.create_new_block(chain.run_pow(), chain.last_block().get_hash());
         assert!(Blockchain::valid_chain(&chain));
-        chain.new_block(chain.run_pow(), chain.last_block().get_hash());
+        chain.create_new_block(chain.run_pow(), chain.last_block().get_hash());
         assert!(Blockchain::valid_chain(&chain));
 
         // tamper an intermediate block
@@ -284,7 +289,7 @@ mod tests {
         assert!(Blockchain::valid_chain(&chain));
 
         // add a block without running pow
-        chain.new_block(456, chain.last_block().get_hash());
+        chain.create_new_block(456, chain.last_block().get_hash());
         assert!(!Blockchain::valid_chain(&chain));
         chain.blocks.pop();
         assert!(Blockchain::valid_chain(&chain));

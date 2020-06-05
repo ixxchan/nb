@@ -32,8 +32,8 @@ impl PeerInfo {
 
 type ResponseHandler = fn(&Response) -> Result<bool>;
 
-/// TODO: add consensus protocol specification
-/// TODO: mpsc is not needed, since Arc<Mutex<Node>> is used
+// TODO: add consensus protocol specification
+// TODO: mpsc is not needed, since Arc<Mutex<Node>> is used
 pub struct Node {
     basic_info: PeerInfo,
     chain: Blockchain,
@@ -63,6 +63,11 @@ impl Node {
         self.chain.get_blocks()
     }
 
+    /// Displays the full blockchain
+    pub fn display(&self) {
+        self.chain.display();
+    }
+
     /// Mines a new block
     pub fn mine(&mut self) {
         let last_block = self.chain.last_block();
@@ -72,7 +77,7 @@ impl Node {
         // The sender is "0" to signify that this node has mined a new coin.
         self.create_and_add_new_transaction("0", &self.basic_info.id.clone(), 1);
 
-        let block = self.chain.new_block(proof, last_hash);
+        let block = self.chain.create_new_block(proof, last_hash);
         info!(
             "[Node {}] A new block {} is forged, will broadcast it to all peers",
             self.basic_info.id,
@@ -96,9 +101,9 @@ impl Node {
         self.async_broadcast_transaction(transaction);
     }
 
-    // Take an incoming transaction and try to add it
-    // If it already exists, drop it and do nothing
-    // Else, add and broadcast it
+    /// Take an incoming transaction and try to add it.
+    /// If it already exists, drop it and do nothing.
+    /// Else, add and broadcast it.
     pub fn handle_incoming_transaction(&mut self, transaction: Transaction) {
         if !self.chain.add_new_transaction(&transaction) {
             debug!("Redundant incoming transaction, simply drop it");
@@ -107,11 +112,14 @@ impl Node {
         self.async_broadcast_transaction(transaction);
     }
 
-    // When a new block comes, check its index:
-    // if its index is lower than or equal to that of out latest block, drop it and do nothing
-    // if its index is exactly one plus our latest block's index and its previous block is our
-    //      latest block, then append it to the end of my chain
-    // else, do nothing to this block but then we need to resolve conflicts
+    /// When a new block comes, check its index:
+    ///
+    /// If its index is lower than or equal to that of out latest block, drop it and do nothing.
+    ///
+    /// If its index is exactly one plus our latest block's index and its previous block is our
+    /// latest block, then append it to the end of my chain.
+    ///
+    /// Else, do nothing to this block but then we need to resolve conflicts.
     pub fn handle_incoming_block(&mut self, block: Block) {
         if self.chain.add_new_block(&block) {
             // broadcast this good news to my friends~
@@ -121,7 +129,7 @@ impl Node {
         };
     }
 
-    pub fn async_broadcast_transaction(&self, transaction: Transaction) {
+    fn async_broadcast_transaction(&self, transaction: Transaction) {
         // add this transaction to broadcast channel
         // which will then send it asynchronously
         self.broadcast_channel_in
@@ -138,7 +146,7 @@ impl Node {
             .unwrap();
     }
 
-    pub fn async_broadcast_block(&self, block: Block) {
+    fn async_broadcast_block(&self, block: Block) {
         self.broadcast_channel_in
             .send((Request::NewBlock(self.get_basic_info(), block), |resp| {
                 if let Response::Ack(_) = resp {
@@ -150,7 +158,7 @@ impl Node {
             .unwrap();
     }
 
-    pub fn async_broadcast_latest_block(&self) {
+    fn async_broadcast_latest_block(&self) {
         match self.get_blocks().last() {
             Some(block) => self.async_broadcast_block(block.to_owned()),
             None => debug!("No block to broadcast"),
@@ -205,14 +213,9 @@ impl Node {
         Ok(true)
     }
 
-    /// Displays the full blockchain
-    pub fn display(&self) {
-        self.chain.display();
-    }
-
-    // TODO: I think this can be merged into `say_hello()`. The name `detect_peer()` is a little bit ambiguous
-    /// Adds a new peer. Returns false if `addr` is not a valid socket addr
-    pub fn detect_peer(&mut self, addr: &str) -> bool {
+    /// Tries to greet and add a new peer at the given address.
+    /// Returns false if `addr` is not a valid socket addr
+    pub fn greet_and_add_peer(&mut self, addr: &str) -> bool {
         match addr.to_socket_addrs() {
             Ok(addr) => {
                 let addr = addr.as_slice();
@@ -235,7 +238,7 @@ impl Node {
         }
     }
 
-    pub fn say_hello(&mut self, mut stream: TcpStream) -> Result<bool> {
+    fn say_hello(&mut self, mut stream: TcpStream) -> Result<bool> {
         serde_json::to_writer(
             stream.try_clone()?,
             &Request::Hello(self.basic_info.clone()),
@@ -256,6 +259,7 @@ impl Node {
         return Err(failure::err_msg("No response"));
     }
 
+    /// Adds a given `PeerInfo` to the peer list. Returns `false` if the peer already exists.
     pub fn add_peer(&mut self, peer: PeerInfo) -> bool {
         if self.peers.contains(&peer) {
             debug!("Peer already exists: {:?}", peer);
@@ -286,7 +290,7 @@ impl Node {
         true
     }
 
-    /// This is our Consensus Algorithm, it resolves conflicts
+    /// This is our Consensus Algorithm, it resolves conflicts (explicitly)
     /// by replacing our chain with the longest one in the network.
     /// Returns `true` if the chain is replaced
     pub fn resolve_conflicts(&mut self) -> bool {
