@@ -30,6 +30,7 @@ impl PeerInfo {
     }
 }
 
+/// TODO: add consensus protocol specification
 pub struct Node {
     basic_info: PeerInfo,
     chain: Blockchain,
@@ -163,6 +164,7 @@ impl Node {
         }
     }
 
+    // TODO: what does the return value mean?
     fn broadcast_request(
         &self,
         req: &Request,
@@ -176,7 +178,7 @@ impl Node {
         for peer in peers.iter() {
             debug!("Connecting {:?}", peer);
             let socket_address = peer.get_address().to_socket_addrs().unwrap().as_slice()[0];
-            return match TcpStream::connect(socket_address) {
+            match TcpStream::connect(socket_address) {
                 Ok(mut stream) => {
                     serde_json::to_writer(stream.try_clone()?, req)?;
                     stream.flush()?;
@@ -185,17 +187,18 @@ impl Node {
                     {
                         let response = response
                             .map_err(|e| failure::err_msg(format!("Deserializing error {}", e)))?;
-                        return response_handler(&response);
+                        let _result = response_handler(&response);
                     }
-                    Err(failure::err_msg("No response"))
+                    // Err(failure::err_msg("No response"))
                 }
                 Err(e) => {
                     debug!("Connection to {:?} failed: {}", peer, e);
-                    Err(failure::err_msg("Failed to connect"))
+                    // Err(failure::err_msg("Failed to connect"))
                 }
             };
         }
-        Err(failure::err_msg("No peer to connect"))
+        // Err(failure::err_msg("No peer to connect"))
+        Ok(true)
     }
 
     /// Displays the full blockchain
@@ -203,6 +206,7 @@ impl Node {
         self.chain.display();
     }
 
+    // TODO: I think this can be merged into `say_hello()`. The name `detect_peer()` is a little bit ambiguous
     /// Adds a new peer. Returns false if `addr` is not a valid socket addr
     pub fn detect_peer(&mut self, addr: &str) -> bool {
         match addr.to_socket_addrs() {
