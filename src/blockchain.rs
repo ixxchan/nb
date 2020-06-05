@@ -90,10 +90,18 @@ impl Blockchain {
 
     /// Adds a new transaction to the list of transactions
     pub fn add_new_transaction(&mut self, transaction: &Transaction) -> bool {
-        // check whether it already exists
+        // check whether it already exists in current transactions
         for t in &self.current_transactions {
             if t.get_id() == transaction.get_id() {
                 return false;
+            }
+        }
+        // check whether it has already been added to the blockchain
+        for b in &self.blocks {
+            for t in &b.transactions {
+                if t.get_id() == transaction.get_id() {
+                    return false;
+                }
             }
         }
         self.current_transactions.push(transaction.clone());
