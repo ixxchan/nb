@@ -151,11 +151,12 @@ fn handle_incoming_connections(node: Arc<Mutex<Node>>, addr: String) -> Result<(
                         .map_err(|e| failure::err_msg(format!("Deserializing error {}", e)))?;
                     debug!("request received {:?}", request);
                     // try to add a new peer from every request
+                    let mut node = node.lock().unwrap();
                     let peer_info = request.get_peer_info();
-                    if node.lock().unwrap().add_peer(peer_info.clone()) {
+                    if node.add_peer(peer_info.clone()) {
                         info!("Add one new peer: {:?}", peer_info);
                     }
-                    let my_info = node.lock().unwrap().get_basic_info();
+                    let my_info = node.get_basic_info();
                     let response = match request {
                         Request::Hello(peer_info) => {
                             info!("Get Hello from {:?}, simply ack it", peer_info);
@@ -166,9 +167,7 @@ fn handle_incoming_connections(node: Arc<Mutex<Node>>, addr: String) -> Result<(
                                 "Get NewTransaction from {:?}, add the transaction and ack it",
                                 peer_info
                             );
-                            node.lock()
-                                .unwrap()
-                                .handle_incoming_transaction(transaction);
+                            node.handle_incoming_transaction(transaction);
                             Response::Ack(my_info)
                         }
                         Request::NewBlock(peer_info, new_block) => {
@@ -176,7 +175,7 @@ fn handle_incoming_connections(node: Arc<Mutex<Node>>, addr: String) -> Result<(
                                 "Get NewBlock from {:?}, validate it and possibly add it to our chain",
                                 peer_info
                             );
-                            node.lock().unwrap().handle_incoming_block(new_block);
+                            node.handle_incoming_block(new_block);
                             Response::Ack(my_info)
                         }
                         Request::HowAreYou(peer_info) => {
@@ -184,7 +183,6 @@ fn handle_incoming_connections(node: Arc<Mutex<Node>>, addr: String) -> Result<(
                                 "Get HowAreYou from {:?}, will respond with all my blocks",
                                 peer_info
                             );
-                            let node = node.lock().unwrap();
                             Response::MyBlocks(node.get_basic_info(), node.get_blocks())
                         }
                     };
