@@ -42,7 +42,8 @@ fn run_node(addr: String) {
 
     let listener_node = node.clone();
     thread::spawn(move || handle_incoming_connections(listener_node, addr.clone()));
-
+    let broadcast_node = node.clone();
+    thread::spawn(move || handle_broadcast(broadcast_node));
     loop {
         let mut input = String::new();
         // a prompt for input
@@ -191,4 +192,10 @@ fn handle_incoming_connections(node: Arc<Mutex<Node>>, addr: String) -> Result<(
         }
     }
     Ok(())
+}
+
+fn handle_broadcast(node: Arc<Mutex<Node>>) {
+    loop {
+        node.lock().unwrap().try_fetch_one_broadcast();
+    }
 }

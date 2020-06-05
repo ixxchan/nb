@@ -7,6 +7,7 @@ use serde_json::Deserializer;
 use std::collections::HashSet;
 use std::io::Write;
 use std::net::{TcpStream, ToSocketAddrs};
+use std::sync::mpsc::{channel, Receiver, Sender};
 use uuid::Uuid;
 
 // self introduction for others to contact you
@@ -33,14 +34,19 @@ pub struct Node {
     basic_info: PeerInfo,
     chain: Blockchain,
     peers: HashSet<PeerInfo>,
+    broadcast_channel_in: Sender<(Request, fn(&Response) -> Result<bool>)>,
+    broadcast_channel_out: Receiver<(Request, fn(&Response) -> Result<bool>)>,
 }
 
 impl Node {
     pub fn new(addr: String) -> Self {
+        let (tx, rx) = channel();
         Node {
             basic_info: PeerInfo::new(addr),
             chain: Blockchain::new(),
             peers: HashSet::new(),
+            broadcast_channel_in: tx,
+            broadcast_channel_out: rx,
         }
     }
 
@@ -84,7 +90,7 @@ impl Node {
             "[Node {}] A new transaction is added: {} -> {}, amount: {}",
             self.basic_info.id, sender, receiver, amount
         );
-        self.broadcast_transaction(transaction);
+        self.async_broadcast_transaction(transaction);
     }
 
     // Take an incoming transaction and try to add it
@@ -92,55 +98,72 @@ impl Node {
     // Else, add and broadcast it
     pub fn add_incoming_transaction(&mut self, transaction: Transaction) {
         if !self.chain.add_new_transaction(&transaction) {
+            debug!("Redundant incoming transaction, simply drop it");
             return;
         }
-        // TODO: how to avoid deadlock when broadcasting?
-        // self.broadcast_transaction(transaction)
+        self.async_broadcast_transaction(transaction);
     }
 
-    pub fn broadcast_transaction(&self, transaction: Transaction) {
+    pub fn async_broadcast_transaction(&self, transaction: Transaction) {
+        // add this transaction to broadcast channel
+        // which will then send it asynchronously
+        self.broadcast_channel_in
+            .send((
+                Request::NewTransaction(self.basic_info.clone(), transaction),
+                |resp| {
+                    if let Response::Ack(_) = resp {
+                        Ok(true)
+                    } else {
+                        Ok(false)
+                    }
+                },
+            ))
+            .unwrap();
+    }
+
+    pub fn try_fetch_one_broadcast(&self) {
+        let recv_res = self.broadcast_channel_out.try_recv();
+        match recv_res {
+            Ok((req, handler)) => {
+                let _ = self.broadcast_request(&req, handler);
+            }
+            Err(_) => {}
+        }
+    }
+
+    fn broadcast_request(
+        &self,
+        req: &Request,
+        response_handler: fn(&Response) -> Result<bool>,
+    ) -> Result<bool> {
         let peers = self.peers.clone();
         debug!(
-            "[Node {}] broadcasts transaction {:?} to peers :{:?}",
-            self.basic_info.id,
-            transaction.get_id(),
-            peers
+            "[Node {}] broadcasts request {:?} to peers :{:?}",
+            self.basic_info.id, req, peers
         );
         for peer in peers.iter() {
             debug!("Connecting {:?}", peer);
             let socket_address = peer.get_address().to_socket_addrs().unwrap().as_slice()[0];
-            match TcpStream::connect(socket_address) {
-                Ok(stream) => {
-                    let _ = self.send_transaction(stream, transaction.clone());
+            return match TcpStream::connect(socket_address) {
+                Ok(mut stream) => {
+                    serde_json::to_writer(stream.try_clone()?, req)?;
+                    stream.flush()?;
+                    for response in
+                        Deserializer::from_reader(stream.try_clone()?).into_iter::<Response>()
+                    {
+                        let response = response
+                            .map_err(|e| failure::err_msg(format!("Deserializing error {}", e)))?;
+                        return response_handler(&response);
+                    }
+                    Err(failure::err_msg("No response"))
                 }
-                Err(e) => debug!("Connection to {:?} failed: {}", peer, e),
-            }
-        }
-    }
-
-    pub fn send_transaction(
-        &self,
-        mut stream: TcpStream,
-        transaction: Transaction,
-    ) -> Result<bool> {
-        serde_json::to_writer(
-            stream.try_clone()?,
-            &Request::NewTransaction(self.basic_info.clone(), transaction),
-        )?;
-        stream.flush()?;
-        debug!("Request sent");
-        // There should be only one response, but we have to deserialize from a stream in this way
-        for response in Deserializer::from_reader(stream.try_clone()?).into_iter::<Response>() {
-            let response =
-                response.map_err(|e| failure::err_msg(format!("Deserializing error {}", e)))?;
-            return if let Response::Ack(_) = response {
-                debug!("Response received");
-                Ok(true)
-            } else {
-                Err(failure::err_msg("Invalid response received"))
+                Err(e) => {
+                    debug!("Connection to {:?} failed: {}", peer, e);
+                    Err(failure::err_msg("Failed to connect"))
+                }
             };
         }
-        Err(failure::err_msg("No response"))
+        Err(failure::err_msg("No peer to connect"))
     }
 
     /// Displays the full blockchain
