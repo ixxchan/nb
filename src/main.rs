@@ -39,7 +39,12 @@ fn main() {
 }
 
 fn run_node(addr: String) {
-    let node = Arc::new(Mutex::new(Node::new(addr.clone())));
+    let node = Node::new(addr.clone());
+    if let Err(e) = node {
+        error!("Fail to create node: {:?}", e);
+        std::process::exit(1);
+    }
+    let node = Arc::new(Mutex::new(node.unwrap()));
 
     let listener_node = node.clone();
     thread::spawn(move || {

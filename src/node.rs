@@ -5,8 +5,8 @@ use crate::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Deserializer;
 use std::collections::HashSet;
-use std::io::Write;
-use std::net::{TcpStream, ToSocketAddrs};
+use std::io::{stdout, Write};
+use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use uuid::Uuid;
 
@@ -14,19 +14,27 @@ use uuid::Uuid;
 #[derive(Hash, Eq, PartialEq, Serialize, Deserialize, Debug, Clone)]
 pub struct PeerInfo {
     id: String,
-    address: String,
+    address: SocketAddr,
+}
+
+fn parse_addr(addr: String) -> Result<SocketAddr> {
+    Ok(addr.to_socket_addrs().map(|addr| {
+        let addr = addr.as_slice();
+        assert_eq!(addr.len(), 1);
+        addr[0].to_owned()
+    })?)
 }
 
 impl PeerInfo {
-    pub fn new(address: String) -> Self {
-        PeerInfo {
+    pub fn new(address: String) -> Result<Self> {
+        Ok(PeerInfo {
             id: Uuid::new_v4().to_string(),
-            address,
-        }
+            address: parse_addr(address)?,
+        })
     }
 
-    pub fn get_address(&self) -> &str {
-        self.address.as_str()
+    pub fn get_address(&self) -> SocketAddr {
+        self.address.clone()
     }
 }
 
@@ -43,15 +51,15 @@ pub struct Node {
 }
 
 impl Node {
-    pub fn new(addr: String) -> Self {
+    pub fn new(addr: String) -> Result<Self> {
         let (tx, rx) = channel();
-        Node {
-            basic_info: PeerInfo::new(addr),
+        Ok(Node {
+            basic_info: PeerInfo::new(addr)?,
             chain: Blockchain::new(),
             peers: HashSet::new(),
             broadcast_channel_in: tx,
             broadcast_channel_out: rx,
-        }
+        })
     }
 
     pub fn get_basic_info(&self) -> PeerInfo {
@@ -66,6 +74,13 @@ impl Node {
     /// Displays the full blockchain
     pub fn display(&self) {
         self.chain.display();
+        println!();
+    }
+
+    /// Displays the peers
+    pub fn display_peers(&self) {
+        serde_json::to_writer_pretty(stdout(), &self.peers).expect("fail to display peers");
+        println!();
     }
 
     /// Mines a new block
@@ -79,8 +94,7 @@ impl Node {
 
         let block = self.chain.create_new_block(proof, last_hash);
         info!(
-            "[Node {}] A new block {} is forged, will broadcast it to all peers",
-            self.basic_info.id,
+            "A new block {} is forged, will broadcast it to all peers",
             block.get_index()
         );
         // broadcast the newly mined block
@@ -95,8 +109,8 @@ impl Node {
             return;
         }
         info!(
-            "[Node {}] A new transaction is added: {} -> {}, amount: {}",
-            self.basic_info.id, sender, receiver, amount
+            "A new transaction is added: {} -> {}, amount: {}",
+            sender, receiver, amount
         );
         self.async_broadcast_transaction(transaction);
     }
@@ -159,14 +173,11 @@ impl Node {
     }
 
     fn async_broadcast_latest_block(&self) {
-        match self.get_blocks().last() {
-            Some(block) => self.async_broadcast_block(block.to_owned()),
-            None => debug!("No block to broadcast"),
-        }
+        self.async_broadcast_block(self.chain.last_block().to_owned())
     }
 
     pub fn try_fetch_one_broadcast(&self) {
-        debug!("try_fetch_one_broadcast...");
+        trace!("try_fetch_one_broadcast...");
         let recv_res = self.broadcast_channel_out.try_recv();
         match recv_res {
             Ok((req, handler)) => {
@@ -183,8 +194,7 @@ impl Node {
         debug!("broadcasts request {:?} to peers :{:?}", req, peers);
         for peer in peers.iter() {
             debug!("Connecting {:?}", peer);
-            let socket_address = peer.get_address().to_socket_addrs().unwrap().as_slice()[0];
-            match TcpStream::connect(socket_address) {
+            match TcpStream::connect(peer.get_address()) {
                 Ok(mut stream) => {
                     serde_json::to_writer(stream.try_clone()?, req)?;
                     stream.flush()?;
@@ -216,25 +226,23 @@ impl Node {
     /// Tries to greet and add a new peer at the given address.
     /// Returns false if `addr` is not a valid socket addr
     pub fn greet_and_add_peer(&mut self, addr: &str) -> bool {
-        match addr.to_socket_addrs() {
-            Ok(addr) => {
-                let addr = addr.as_slice();
-                assert_eq!(addr.len(), 1);
-                match TcpStream::connect(addr[0]) {
-                    Ok(stream) => {
-                        if let Ok(true) = self.say_hello(stream) {
-                            true
-                        } else {
-                            false
-                        }
-                    }
-                    Err(e) => {
-                        error!("Error when communicating with {:?}: {}", addr, e);
+        if let Ok(addr) = parse_addr(addr.to_owned()) {
+            match TcpStream::connect(addr) {
+                Ok(stream) => {
+                    if let Ok(true) = self.say_hello(stream) {
+                        true
+                    } else {
                         false
                     }
                 }
+                Err(e) => {
+                    error!("Error when communicating with {:?}: {}", addr, e);
+                    false
+                }
             }
-            Err(_) => false,
+        } else {
+            error!("Invalid peer address {}", addr);
+            false
         }
     }
 
@@ -299,8 +307,7 @@ impl Node {
         debug!("Resolve conflict with peers :{:?}", peers);
         for peer in peers.iter() {
             debug!("Connecting {:?}", peer);
-            let socket_address = peer.get_address().to_socket_addrs().unwrap().as_slice()[0];
-            match TcpStream::connect(socket_address) {
+            match TcpStream::connect(peer.get_address()) {
                 Ok(stream) => {
                     debug!("Resolve conflict with peer :{:?}", peer);
                     match self.resolve_conflict(stream) {
