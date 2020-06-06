@@ -72,6 +72,7 @@ fn run_node(addr: String) {
         const NEW_TRANS: &str = "new_trans";
         const SEE_BLOCKCHAIN: &str = "list_blocks";
         const ADD_PEER: &str = "add_peer";
+        const LIST_PEERS: &str = "list_peers";
         const RESOLVE_CONFLICTS: &str = "resolve";
         const EXIT: &str = "exit";
         const HELP: &str = "help";
@@ -114,6 +115,9 @@ fn run_node(addr: String) {
                         eprintln!("fail to add peer");
                     }
                 }
+                LIST_PEERS => {
+                    node.display_peers();
+                }
                 RESOLVE_CONFLICTS => {
                     if node.resolve_conflicts() {
                         println!("node updated");
@@ -141,6 +145,7 @@ fn list_commands() {
     "  new_trans [sender] [receiver] [amount] - adds a new transaction into the local blockchain\n",
     "  list_blocks - list the local chain blocks\n",
     "  add_peer [addr:port] - add one node as a peer\n",
+    "  list_peers - list the node's peers\n",
     "  resolve - apply the consensus algorithm to resolve conflicts\n",
     "  exit - quit the program"));
 }
