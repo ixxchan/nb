@@ -202,7 +202,6 @@ impl Node {
         let recv_res = self.broadcast_channel_out.try_recv();
         match recv_res {
             Ok((req, handler)) => {
-                debug!("broadcast fetched");
                 let _ = self.broadcast_request(&req, handler);
             }
             Err(_) => {}
@@ -211,6 +210,7 @@ impl Node {
 
     // TODO: what does the return value mean?
     fn broadcast_request(&self, req: &Request, response_handler: ResponseHandler) -> Result<bool> {
+        debug!("{}", "broadcast begins".color(PROMINENT_COLOR));
         let peers = self.peers.clone();
         debug!("broadcasts request {:?} to peers :{:?}", req, peers);
         for peer in peers.iter() {
@@ -240,7 +240,7 @@ impl Node {
             debug!("broadcast to one peer finished");
         }
         // Err(failure::err_msg("No peer to connect"))
-        debug!("broadcast finished");
+        debug!("{}", "broadcast finished".color(PROMINENT_COLOR));
         Ok(true)
     }
 

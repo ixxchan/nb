@@ -2,6 +2,7 @@
 extern crate log;
 
 use clap::{App, AppSettings, Arg};
+use colored::*;
 use env_logger::Env;
 use nb::message::{Request, Response};
 use nb::{Node, Result};
@@ -11,6 +12,10 @@ use std::net::TcpListener;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
+
+const MSG_COLOR: &str = "yellow";
+const ERR_COLOR: &str = "red";
+const PROMPT_COLOR: &str = "blue";
 
 fn main() {
     let matches = App::new("nb")
@@ -59,7 +64,7 @@ fn run_node(addr: String) {
     loop {
         let mut input = String::new();
         // a prompt for input
-        print!("> ");
+        print!("{}", "> ".color(PROMPT_COLOR).bold());
         stdout().flush().expect("flush error");
 
         stdin().read_line(&mut input).expect("cannot read input");
@@ -72,7 +77,6 @@ fn run_node(addr: String) {
                 continue;
             }
         };
-        debug!("args: {:?}, command: {}", args, command);
 
         const NEW_TRANS: &str = "new_trans";
         const SEE_BLOCKCHAIN: &str = "list_blocks";
@@ -88,7 +92,7 @@ fn run_node(addr: String) {
             match command {
                 NEW_TRANS => {
                     if args.len() < 4 {
-                        eprintln!("not enough arguments!");
+                        eprintln!("{}", "not enough arguments!".color(ERR_COLOR));
                         continue;
                     }
                     let sender = *args.get(1).unwrap();
@@ -97,7 +101,7 @@ fn run_node(addr: String) {
                     match (*args.get(3).unwrap()).parse() {
                         Ok(num) => amount = num,
                         Err(_) => {
-                            eprintln!("illegal amount!");
+                            eprintln!("{}", "illegal amount!".color(ERR_COLOR));
                             continue;
                         }
                     };
@@ -105,19 +109,19 @@ fn run_node(addr: String) {
                 }
                 MINE => {
                     node.mine();
-                    debug!("Mined!!!")
+                    debug!("{}", "Mined!!!".color(MSG_COLOR))
                 }
                 SEE_BLOCKCHAIN => {
                     node.display();
                 }
                 ADD_PEER => {
                     if args.len() < 2 {
-                        eprintln!("not enough arguments!");
+                        eprintln!("{}", "not enough arguments!".color(ERR_COLOR));
                         continue;
                     }
                     let peer = *args.get(1).unwrap();
                     if false == node.greet_and_add_peer(peer) {
-                        eprintln!("fail to add peer");
+                        eprintln!("{}", "fail to add peer".color(ERR_COLOR));
                     }
                 }
                 LIST_PEERS => {
@@ -137,7 +141,10 @@ fn run_node(addr: String) {
                     break;
                 }
                 _ => {
-                    println!("Command not found. Type 'help' to list commands.");
+                    eprintln!(
+                        "{}",
+                        "Command not found. Type 'help' to list commands.".color(ERR_COLOR)
+                    );
                 }
             }
         }
@@ -145,14 +152,18 @@ fn run_node(addr: String) {
 }
 
 fn list_commands() {
-    println!(concat!("blockchain node commands:\n",
+    println!(
+        "{}",
+        concat!("blockchain node commands:\n",
     "  mine - mines a new block\n",
     "  new_trans [sender] [receiver] [amount] - adds a new transaction into the local blockchain\n",
     "  list_blocks - list the local chain blocks\n",
     "  add_peer [addr:port] - add one node as a peer\n",
     "  list_peers - list the node's peers\n",
     "  resolve - apply the consensus algorithm to resolve conflicts\n",
-    "  exit - quit the program"));
+    "  exit - quit the program")
+        .color(MSG_COLOR)
+    );
 }
 
 fn handle_incoming_connections(node: Arc<Mutex<Node>>, addr: String) -> Result<()> {
