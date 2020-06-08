@@ -115,6 +115,14 @@ impl Node {
         self.async_broadcast_transaction(transaction);
     }
 
+    pub fn handle_incoming_peer(&mut self, peer: PeerInfo) {
+        if !self.add_peer(&peer) {
+            debug!("Redundant incoming peer, simply drop it");
+            return;
+        }
+        self.async_broadcast_peer(peer);
+    }
+
     /// Take an incoming transaction and try to add it.
     /// If it already exists, drop it and do nothing.
     /// Else, add and broadcast it.
@@ -174,6 +182,18 @@ impl Node {
 
     fn async_broadcast_latest_block(&self) {
         self.async_broadcast_block(self.chain.last_block().to_owned())
+    }
+
+    fn async_broadcast_peer(&self, peer: PeerInfo) {
+        self.broadcast_channel_in
+            .send((Request::NewPeer(self.get_basic_info(), peer), |resp| {
+                if let Response::Ack(_) = resp {
+                    Ok(true)
+                } else {
+                    Err(failure::err_msg("Invalid response type"))
+                }
+            }))
+            .unwrap();
     }
 
     pub fn try_fetch_one_broadcast(&self) {
@@ -259,7 +279,8 @@ impl Node {
                 response.map_err(|e| failure::err_msg(format!("Deserializing error {}", e)))?;
             return if let Response::Ack(peer_info) = response {
                 debug!("Ack for Hello received from: {:?}", peer_info);
-                Ok(self.add_peer(peer_info))
+                self.async_broadcast_peer(peer_info.clone());
+                Ok(self.add_peer(&peer_info))
             } else {
                 Err(failure::err_msg("Invalid response"))
             };
@@ -268,13 +289,16 @@ impl Node {
     }
 
     /// Adds a given `PeerInfo` to the peer list. Returns `false` if the peer already exists.
-    pub fn add_peer(&mut self, peer: PeerInfo) -> bool {
-        if self.peers.contains(&peer) {
+    pub fn add_peer(&mut self, peer: &PeerInfo) -> bool {
+        if &self.basic_info == peer {
+            debug!("Peer is myself");
+            false
+        } else if self.peers.contains(peer) {
             debug!("Peer already exists: {:?}", peer);
             false
         } else {
             debug!("New peer added: {:?}", peer);
-            self.peers.insert(peer);
+            self.peers.insert(peer.clone());
             true
         }
     }

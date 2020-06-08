@@ -7,15 +7,18 @@ pub enum Request {
     HowAreYou(PeerInfo),
     NewTransaction(PeerInfo, Transaction),
     NewBlock(PeerInfo, Block),
+    NewPeer(PeerInfo, PeerInfo),
 }
 
 impl Request {
-    pub fn get_peer_info(&self) -> &PeerInfo {
+    /// Get the `PeerInfo` of the request sender
+    pub fn get_sender_peer_info(&self) -> &PeerInfo {
         match self {
             Request::Hello(p)
             | Request::HowAreYou(p)
             | Request::NewTransaction(p, _)
-            | Request::NewBlock(p, _) => p,
+            | Request::NewBlock(p, _)
+            | Request::NewPeer(p, _) => p,
         }
     }
 }

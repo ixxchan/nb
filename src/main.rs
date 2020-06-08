@@ -169,8 +169,9 @@ fn handle_incoming_connections(node: Arc<Mutex<Node>>, addr: String) -> Result<(
                     debug!("request received {:?}", request);
                     // try to add a new peer from every request
                     let mut node = node.lock().unwrap();
-                    let peer_info = request.get_peer_info();
-                    if node.add_peer(peer_info.clone()) {
+                    let peer_info = request.get_sender_peer_info();
+                    // this seems not very useful, no new peer will be added except `Hello` request received
+                    if node.add_peer(&peer_info) {
                         info!("Add one new peer: {:?}", peer_info);
                     }
                     let my_info = node.get_basic_info();
@@ -201,6 +202,14 @@ fn handle_incoming_connections(node: Arc<Mutex<Node>>, addr: String) -> Result<(
                                 peer_info
                             );
                             Response::MyBlocks(node.get_basic_info(), node.get_blocks())
+                        }
+                        Request::NewPeer(peer_info, new_peer) => {
+                            info!(
+                                "Get NewPeer from {:?}, new peer is {:?}",
+                                peer_info, new_peer
+                            );
+                            node.handle_incoming_peer(new_peer);
+                            Response::Ack(my_info)
                         }
                     };
                     serde_json::to_writer(&mut stream, &response)?;
