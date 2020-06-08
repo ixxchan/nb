@@ -90,6 +90,7 @@ impl Node {
         let last_hash = last_block.get_hash();
         // receive a reward for finding the proof.
         // The sender is "0" to signify that this node has mined a new coin.
+        // TODO: This bonus transaction should not broadcast
         self.create_and_add_new_transaction("0", &self.basic_info.id.clone(), 1);
 
         let block = self.chain.create_new_block(proof, last_hash);

@@ -25,6 +25,16 @@ pub struct Block {
 }
 
 impl Block {
+    pub fn get_genesis() -> Self {
+        Block {
+            index: 0,
+            timestamp: 0,
+            proof: 100,
+            transactions: Vec::new(),
+            previous_hash: String::from("1"),
+        }
+    }
+
     /// Returns the index of the Block in the chain.
     pub fn get_index(&self) -> u64 {
         self.index
@@ -48,12 +58,10 @@ pub struct Blockchain {
 impl Blockchain {
     /// Creates a new Blockchain with only the genesis block.
     pub fn new() -> Self {
-        let mut chain = Blockchain {
+        Blockchain {
             current_transactions: vec![],
-            blocks: vec![],
-        };
-        chain.create_new_block(100, "1".to_owned());
-        chain
+            blocks: vec![Block::get_genesis()],
+        }
     }
 
     /// Creates a blockchain from given blocks.
@@ -100,7 +108,7 @@ impl Blockchain {
         let transactions = mem::replace(&mut self.current_transactions, Vec::new());
 
         let block = Block {
-            index: (self.blocks.len() + 1) as u64,
+            index: self.blocks.len() as u64,
             timestamp: get_time(),
             proof,
             transactions,
@@ -114,10 +122,10 @@ impl Blockchain {
     /// Adds a given block to the chain. Returns `false` if the new block is invalid.
     pub fn add_new_block(&mut self, block: &Block) -> bool {
         let (block_idx, current_len) = (block.get_index(), self.blocks.len() as u64);
-        if block_idx <= current_len {
+        if block_idx < current_len {
             debug!("The incoming block is too old, so it is dropped");
             false
-        } else if block_idx == current_len + 1 {
+        } else if block_idx == current_len {
             let last_block = self.last_block();
             if last_block.get_hash() != block.previous_hash
                 || !Blockchain::valid_proof(last_block.proof, block.proof)
@@ -127,7 +135,7 @@ impl Blockchain {
             } else {
                 // okay, now this block looks good to us
                 debug!("The incoming block is accepted :)");
-                self.add_new_block(block);
+                self.blocks.push(block.clone());
                 true
             }
         } else {
@@ -174,13 +182,13 @@ impl Blockchain {
 
     /// Validates a given blockchain.
     pub fn valid_chain(chain: &Self) -> bool {
-        let mut last_block = &chain.blocks[0];
+        let mut prev_block = &chain.blocks[0];
         let mut block;
 
         // check the genesis block
-        if last_block.proof != 100
-            || last_block.transactions.len() != 0
-            || last_block.previous_hash != "1".to_owned()
+        if prev_block.proof != 100
+            || prev_block.transactions.len() != 0
+            || prev_block.previous_hash != "1".to_owned()
         {
             return false;
         }
@@ -189,18 +197,18 @@ impl Blockchain {
             block = &chain.blocks[i];
             trace!("validating chain ...");
             trace!(
-                "last_block: {}",
-                serde_json::to_string(&last_block).unwrap()
+                "prev_block: {}",
+                serde_json::to_string(&prev_block).unwrap()
             );
             trace!("block: {}", serde_json::to_string(&block).unwrap());
             trace!("");
-            if last_block.get_hash() != block.previous_hash {
+            if prev_block.get_hash() != block.previous_hash {
                 return false;
             }
-            if !Blockchain::valid_proof(last_block.proof, block.proof) {
+            if !Blockchain::valid_proof(prev_block.proof, block.proof) {
                 return false;
             }
-            last_block = block;
+            prev_block = block;
         }
         true
     }
