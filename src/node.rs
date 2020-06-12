@@ -46,8 +46,8 @@ pub struct Node {
     basic_info: PeerInfo,
     chain: Blockchain,
     peers: HashSet<PeerInfo>,
-    broadcast_channel_in: Sender<(Request, ResponseHandler)>,
-    broadcast_channel_out: Receiver<(Request, ResponseHandler)>,
+    broadcast_channel_in: Sender<Request>,
+    broadcast_channel_out: Receiver<Request>,
 }
 
 impl Node {
@@ -157,27 +157,14 @@ impl Node {
         // which will then send it asynchronously
         self.broadcast_channel_in
             .send((
-                Request::NewTransaction(self.basic_info.clone(), transaction),
-                |resp| {
-                    if let Response::Ack(_) = resp {
-                        Ok(true)
-                    } else {
-                        Ok(false)
-                    }
-                },
+                Request::NewTransaction(self.basic_info.clone(), transaction)
             ))
             .unwrap();
     }
 
     fn async_broadcast_block(&self, block: Block) {
         self.broadcast_channel_in
-            .send((Request::NewBlock(self.get_basic_info(), block), |resp| {
-                if let Response::Ack(_) = resp {
-                    Ok(true)
-                } else {
-                    Err(failure::err_msg("Invalid response type"))
-                }
-            }))
+            .send((Request::NewBlock(self.get_basic_info(), block)))
             .unwrap();
     }
 
@@ -187,13 +174,7 @@ impl Node {
 
     fn async_broadcast_peer(&self, peer: PeerInfo) {
         self.broadcast_channel_in
-            .send((Request::NewPeer(self.get_basic_info(), peer), |resp| {
-                if let Response::Ack(_) = resp {
-                    Ok(true)
-                } else {
-                    Err(failure::err_msg("Invalid response type"))
-                }
-            }))
+            .send((Request::NewPeer(self.get_basic_info(), peer)))
             .unwrap();
     }
 
@@ -201,15 +182,15 @@ impl Node {
         trace!("try_fetch_one_broadcast...");
         let recv_res = self.broadcast_channel_out.try_recv();
         match recv_res {
-            Ok((req, handler)) => {
-                let _ = self.broadcast_request(&req, handler);
+            Ok(req) => {
+                let _ = self.broadcast_request(&req);
             }
             Err(_) => {}
         }
     }
 
     // TODO: what does the return value mean?
-    fn broadcast_request(&self, req: &Request, response_handler: ResponseHandler) -> Result<bool> {
+    fn broadcast_request(&self, req: &Request) -> Result<bool> {
         debug!("{}", "broadcast begins".color(PROMINENT_COLOR));
         let peers = self.peers.clone();
         debug!("broadcasts request {:?} to peers :{:?}", req, peers);
@@ -219,18 +200,7 @@ impl Node {
                 Ok(mut stream) => {
                     serde_json::to_writer(stream.try_clone()?, req)?;
                     stream.flush()?;
-                    debug!("Request broadcast, waiting for Response");
-                    for response in
-                        Deserializer::from_reader(stream.try_clone()?).into_iter::<Response>()
-                    {
-                        debug!("Response received {:?}", response);
-                        let response = response
-                            .map_err(|e| failure::err_msg(format!("Deserializing error {}", e)))?;
-                        let _result = response_handler(&response);
-                        break;
-                    }
-                    debug!("Response handled");
-                    // Err(failure::err_msg("No response"))
+                    debug!("Request broadcast");
                 }
                 Err(e) => {
                     debug!("Connection to {:?} failed: {}", peer, e);
