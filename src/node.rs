@@ -38,7 +38,7 @@ impl PeerInfo {
     }
 
     pub fn get_address(&self) -> SocketAddr {
-        self.address.clone()
+        self.address
     }
 }
 
@@ -57,14 +57,19 @@ fn handle_incoming_connections(addr: String, sender: Sender<Event>) -> Result<()
             Ok(stream) => {
                 // There should be only one request, but we have to deserialize from a stream in this way
                 let mut request = None;
-                for _request in Deserializer::from_reader(stream.try_clone()?).into_iter::<Request>()
+                for _request in
+                    Deserializer::from_reader(stream.try_clone()?).into_iter::<Request>()
                 {
-                    request = Some(_request
-                        .map_err(|e| failure::err_msg(format!("Deserializing error {}", e)))?);
+                    request = Some(
+                        _request
+                            .map_err(|e| failure::err_msg(format!("Deserializing error {}", e)))?,
+                    );
                     debug!("request received {:?}", request);
                     break;
                 }
-                sender.send(Event::Request(stream, request.unwrap()));
+                sender
+                    .send(Event::Request(stream, request.unwrap()))
+                    .unwrap();
             }
             Err(e) => error!("Connection failed: {}", e),
         }
@@ -73,7 +78,8 @@ fn handle_incoming_connections(addr: String, sender: Sender<Event>) -> Result<()
 }
 
 enum Command {
-    NewTrans(String, String, i64), // sender, receiver, amount
+    NewTrans(String, String, i64),
+    // sender, receiver, amount
     Display,
     AddPeer(String),
     DisplayPeers,
@@ -124,7 +130,11 @@ fn handle_input_commands(sender: Sender<Event>) {
                         continue;
                     }
                 };
-                event_cmd = Some(Command::NewTrans(sender.to_owned(), receiver.to_owned(), amount))
+                event_cmd = Some(Command::NewTrans(
+                    sender.to_owned(),
+                    receiver.to_owned(),
+                    amount,
+                ))
             }
             MINE => {
                 event_cmd = Some(Command::Mine);
@@ -208,20 +218,13 @@ impl Node {
         };
 
         loop {
-            match node.event_receiver.recv().unwrap() {
-                Event::Request(stream, request) => {
-                    node.serve_request(stream, request);
-                }
-                Event::Response(_response) => {
-                    unimplemented!();
-                }
-                Event::Broadcast(request) => {
-                    node.broadcast_request(&request);
-                }
-                Event::Command(command) => {
-                    node.serve_command(command);
-                }
-            }
+            // TODO: result not used
+            let _result = match node.event_receiver.recv().unwrap() {
+                Event::Request(stream, request) => node.serve_request(stream, request),
+                Event::Response(_response) => unimplemented!(),
+                Event::Broadcast(request) => node.broadcast_request(&request),
+                Event::Command(command) => node.serve_command(command),
+            };
         }
     }
 
@@ -282,7 +285,7 @@ impl Node {
             Command::Display => self.display(),
             Command::AddPeer(peer) => {
                 // BLOCKING
-                if false == self.greet_and_add_peer(&peer) {
+                if !self.greet_and_add_peer(&peer) {
                     eprintln!("{}", "fail to add peer".color(ERR_COLOR));
                 }
             }
@@ -426,8 +429,7 @@ impl Node {
             .unwrap();
     }
 
-    // TODO: what does the return value mean?
-    fn broadcast_request(&self, req: &Request) -> Result<bool> {
+    fn broadcast_request(&self, req: &Request) -> Result<()> {
         debug!("{}", "broadcast begins".color(PROMINENT_COLOR));
         let peers = self.peers.clone();
         debug!("broadcasts request {:?} to peers :{:?}", req, peers);
@@ -448,7 +450,7 @@ impl Node {
         }
         // Err(failure::err_msg("No peer to connect"))
         debug!("{}", "broadcast finished".color(PROMINENT_COLOR));
-        Ok(true)
+        Ok(())
     }
 
     /// Tries to greet and add a new peer at the given address.
@@ -493,7 +495,7 @@ impl Node {
                 Err(failure::err_msg("Invalid response"))
             };
         }
-        return Err(failure::err_msg("No response"));
+        Err(failure::err_msg("No response"))
     }
 
     /// Adds a given `PeerInfo` to the peer list. Returns `false` if the peer already exists.
@@ -575,6 +577,6 @@ impl Node {
                 Err(failure::err_msg("Invalid response"))
             };
         }
-        return Err(failure::err_msg("No response"));
+        Err(failure::err_msg("No response"))
     }
 }

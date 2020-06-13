@@ -2,16 +2,8 @@
 extern crate log;
 
 use clap::{App, AppSettings, Arg};
-use colored::*;
 use env_logger::Env;
-use nb::message::{Request, Response};
-use nb::{Node, Result};
-use serde_json::Deserializer;
-use std::io::{stdin, stdout, Write};
-use std::net::TcpListener;
-use std::sync::{Arc, Mutex};
-use std::thread;
-use std::time::Duration;
+use nb::Node;
 
 fn main() {
     let matches = App::new("nb")

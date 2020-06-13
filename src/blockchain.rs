@@ -3,6 +3,7 @@
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
 use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
 use std::io::stdout;
 use std::mem;
 use std::time::SystemTime;
@@ -53,6 +54,12 @@ pub struct Blockchain {
     current_transactions: Vec<Transaction>,
     // blocks is non-empty
     blocks: Vec<Block>,
+}
+
+impl Default for Blockchain {
+    fn default() -> Self {
+        Blockchain::new()
+    }
 }
 
 impl Blockchain {
@@ -122,37 +129,41 @@ impl Blockchain {
     /// Adds a given block to the chain. Returns `false` if the new block is invalid.
     pub fn add_new_block(&mut self, block: &Block) -> bool {
         let (block_idx, current_len) = (block.get_index(), self.blocks.len() as u64);
-        if block_idx < current_len {
-            debug!("The incoming block is too old, so it is dropped");
-            false
-        } else if block_idx == current_len {
-            let last_block = self.last_block();
-            if last_block.get_hash() != block.previous_hash
-                || !Blockchain::valid_proof(last_block.proof, block.proof)
-            {
-                debug!("The incoming block is not valid");
+        match block_idx.cmp(&current_len) {
+            Ordering::Less => {
+                debug!("The incoming block is too old, so it is dropped");
                 false
-            } else {
-                // okay, now this block looks good to us
-                // but we should check whether the block contains duplicate transactions with us
-                for t in &block.transactions {
-                    let mut i = 0;
-                    while i < self.current_transactions.len() {
-                        if t.get_id() == self.current_transactions[i].get_id() {
-                            // the order of the transactions doesn't matter, so we can swap_remove
-                            self.current_transactions.swap_remove(i);
-                        } else {
-                            i += 1;
+            }
+            Ordering::Equal => {
+                let last_block = self.last_block();
+                if last_block.get_hash() != block.previous_hash
+                    || !Blockchain::valid_proof(last_block.proof, block.proof)
+                {
+                    debug!("The incoming block is not valid");
+                    false
+                } else {
+                    // okay, now this block looks good to us
+                    // but we should check whether the block contains duplicate transactions with us
+                    for t in &block.transactions {
+                        let mut i = 0;
+                        while i < self.current_transactions.len() {
+                            if t.get_id() == self.current_transactions[i].get_id() {
+                                // the order of the transactions doesn't matter, so we can swap_remove
+                                self.current_transactions.swap_remove(i);
+                            } else {
+                                i += 1;
+                            }
                         }
                     }
+                    debug!("The incoming block is accepted :)");
+                    self.blocks.push(block.clone());
+                    true
                 }
-                debug!("The incoming block is accepted :)");
-                self.blocks.push(block.clone());
-                true
             }
-        } else {
-            debug!("The incoming block is too new for us, we need to resolve conflicts");
-            false
+            Ordering::Greater => {
+                debug!("The incoming block is too new for us, we need to resolve conflicts");
+                false
+            }
         }
     }
 
@@ -169,7 +180,7 @@ impl Blockchain {
     /// Proof of Work algorithm.
     pub fn proof_of_work(last_proof: u64) -> u64 {
         let mut proof = 0;
-        while Blockchain::valid_proof(last_proof, proof) == false {
+        while !Blockchain::valid_proof(last_proof, proof) {
             proof += 1;
         }
         proof
@@ -184,7 +195,7 @@ impl Blockchain {
     fn valid_proof(last_proof: u64, proof: u64) -> bool {
         let mut hasher = Sha256::new();
         hasher.input_str(&format!("{}{}", last_proof, proof));
-        return &hasher.result_str()[0..4] == "0000";
+        &hasher.result_str()[0..4] == "0000"
     }
 
     /// Displays the full blockchain.
@@ -199,8 +210,8 @@ impl Blockchain {
 
         // check the genesis block
         if prev_block.proof != 100
-            || prev_block.transactions.len() != 0
-            || prev_block.previous_hash != "1".to_owned()
+            || !prev_block.transactions.is_empty()
+            || prev_block.previous_hash != "1"
         {
             return false;
         }
