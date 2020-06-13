@@ -1,5 +1,8 @@
-use crate::{Block, PeerInfo, Transaction};
+use crate::*;
 use serde::{Deserialize, Serialize};
+use serde_json::Deserializer;
+use std::net::TcpListener;
+use std::sync::mpsc::Sender;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum Request {
@@ -27,4 +30,32 @@ impl Request {
 pub enum Response {
     Ack(PeerInfo),                  // for Hello, NewTransaction, NewBlock
     MyBlocks(PeerInfo, Vec<Block>), // for HowAreYou
+}
+
+pub fn handle_incoming_connections(addr: String, sender: Sender<Event>) -> Result<()> {
+    let listener = TcpListener::bind(&addr).expect("Fail to bind listener");
+    for stream in listener.incoming() {
+        debug!("new incoming connection");
+        match stream {
+            Ok(stream) => {
+                // There should be only one request, but we have to deserialize from a stream in this way
+                let mut request = None;
+                for _request in
+                    Deserializer::from_reader(stream.try_clone()?).into_iter::<Request>()
+                {
+                    request = Some(
+                        _request
+                            .map_err(|e| failure::err_msg(format!("Deserializing error {}", e)))?,
+                    );
+                    debug!("request received {:?}", request);
+                    break;
+                }
+                sender
+                    .send(Event::Request(stream, request.unwrap()))
+                    .unwrap();
+            }
+            Err(e) => error!("Connection failed: {}", e),
+        }
+    }
+    Ok(())
 }
