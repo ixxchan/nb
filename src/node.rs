@@ -9,7 +9,7 @@ use std::thread;
 
 pub enum Event {
     Request(TcpStream, Request),
-    Response(Response),
+    _Response(Response),
     Broadcast(Request),
     Command(Command),
 }
@@ -44,7 +44,7 @@ impl Node {
             // TODO: result not used
             let _result = match node.event_receiver.recv().unwrap() {
                 Event::Request(stream, request) => node.serve_request(stream, request),
-                Event::Response(_response) => unimplemented!(),
+                Event::_Response(_response) => unimplemented!(),
                 Event::Broadcast(request) => node.broadcast_request(&request),
                 Event::Command(command) => node.serve_command(command),
             };
