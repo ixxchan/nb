@@ -1,5 +1,5 @@
 //! The blockchain node
-use crate::*;
+use super::*;
 use serde_json::Deserializer;
 use std::collections::HashSet;
 use std::io::{stdout, Write};
