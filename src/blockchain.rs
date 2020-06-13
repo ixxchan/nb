@@ -134,6 +134,18 @@ impl Blockchain {
                 false
             } else {
                 // okay, now this block looks good to us
+                // but we should check whether the block contains duplicate transactions with us
+                for t in &block.transactions {
+                    let mut i = 0;
+                    while i < self.current_transactions.len() {
+                        if t.get_id() == self.current_transactions[i].get_id() {
+                            // the order of the transactions doesn't matter, so we can swap_remove
+                            self.current_transactions.swap_remove(i);
+                        } else {
+                            i += 1;
+                        }
+                    }
+                }
                 debug!("The incoming block is accepted :)");
                 self.blocks.push(block.clone());
                 true
