@@ -61,7 +61,7 @@ pub fn handle_input_commands(sender: Sender<Event>) {
             }
             MINE => {
                 event_cmd = Some(Command::Mine);
-                debug!("{}", "Mined!!!".color(MSG_COLOR))
+                debug!("{}", "Ready to mine".color(MSG_COLOR))
             }
             SEE_BLOCKCHAIN => {
                 event_cmd = Some(Command::Display);
