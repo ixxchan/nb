@@ -3,7 +3,7 @@ use super::*;
 use serde_json::Deserializer;
 use std::collections::HashSet;
 use std::io::{stdout, Write};
-use std::net::TcpStream;
+use std::net::{TcpStream, TcpListener};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 
@@ -25,11 +25,12 @@ pub struct Node {
 
 impl Node {
     pub fn run(addr: String) -> Result<()> {
+        let listener = TcpListener::bind(&addr)?;
+
         let (sender, receiver) = channel();
         let sender1 = sender.clone();
         let sender2 = sender.clone();
-        let addr1 = addr.clone();
-        thread::spawn(move || message::handle_incoming_connections(addr1, sender1));
+        thread::spawn(move || message::handle_incoming_connections(listener, sender1));
         thread::spawn(move || command::handle_input_commands(sender2));
 
         let mut node = Node {

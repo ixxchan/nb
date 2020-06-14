@@ -32,8 +32,7 @@ pub enum Response {
     MyBlocks(PeerInfo, Vec<Block>), // for HowAreYou
 }
 
-pub fn handle_incoming_connections(addr: String, sender: Sender<Event>) -> Result<()> {
-    let listener = TcpListener::bind(&addr).expect("Fail to bind listener");
+pub fn handle_incoming_connections(listener: TcpListener, sender: Sender<Event>) -> Result<()> {
     for stream in listener.incoming() {
         debug!("new incoming connection");
         match stream {
