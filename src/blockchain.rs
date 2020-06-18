@@ -148,8 +148,7 @@ impl Blockchain {
                         let mut i = 0;
                         while i < self.current_transactions.len() {
                             if t.get_id() == self.current_transactions[i].get_id() {
-                                // the order of the transactions doesn't matter, so we can swap_remove
-                                self.current_transactions.swap_remove(i);
+                                self.current_transactions.remove(i);
                             } else {
                                 i += 1;
                             }
