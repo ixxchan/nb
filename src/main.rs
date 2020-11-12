@@ -4,6 +4,7 @@ extern crate log;
 use clap::{App, AppSettings, Arg};
 use env_logger::Env;
 use nb::Node;
+use tokio::runtime::Runtime;
 
 fn main() {
     let matches = App::new("nb")
@@ -28,5 +29,6 @@ fn main() {
     info!("nb {}", env!("CARGO_PKG_VERSION"));
     info!("Listening on {}", addr);
 
-    tokio::spawn(async move { Node::handle_events(addr).await.unwrap() });
+    let rt = Runtime::new().expect("tokio runtime can be initialized");
+    rt.block_on(async move { Node::handle_events(addr).await.unwrap() });
 }
