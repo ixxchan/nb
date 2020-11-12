@@ -1,7 +1,7 @@
 use super::*;
 use colored::Colorize;
 use std::io::{stdin, stdout, Write};
-use std::sync::mpsc::Sender;
+use tokio::sync::mpsc::Sender;
 
 pub enum Command {
     NewTrans(String, String, i64), // sender, receiver, amount
@@ -21,7 +21,7 @@ const EXIT: &str = "exit";
 const HELP: &str = "help";
 const MINE: &str = "mine";
 
-pub fn handle_input_commands(sender: Sender<Event>) {
+pub async fn handle_input_commands(sender: Sender<Event>) {
     loop {
         let mut input = String::new();
         // a prompt for input
@@ -94,7 +94,7 @@ pub fn handle_input_commands(sender: Sender<Event>) {
             }
         }
         if let Some(event_cmd) = event_cmd {
-            sender.send(Event::Command(event_cmd)).unwrap();
+            sender.send(Event::Command(event_cmd)).await;
         }
     }
 }

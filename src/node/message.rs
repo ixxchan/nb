@@ -2,7 +2,7 @@ use super::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Deserializer;
 use std::net::TcpListener;
-use std::sync::mpsc::Sender;
+use tokio::sync::mpsc::Sender;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum Request {
@@ -32,7 +32,10 @@ pub enum Response {
     MyBlocks(PeerInfo, Vec<Block>), // for HowAreYou
 }
 
-pub fn handle_incoming_connections(listener: TcpListener, sender: Sender<Event>) -> Result<()> {
+pub async fn handle_incoming_connections(
+    listener: TcpListener,
+    sender: Sender<Event>,
+) -> Result<()> {
     for stream in listener.incoming() {
         debug!("new incoming connection");
         match stream {
@@ -49,9 +52,7 @@ pub fn handle_incoming_connections(listener: TcpListener, sender: Sender<Event>)
                     debug!("request received {:?}", request);
                     break;
                 }
-                sender
-                    .send(Event::Request(stream, request.unwrap()))
-                    .unwrap();
+                sender.send(Event::Request(stream, request.unwrap())).await;
             }
             Err(e) => error!("Connection failed: {}", e),
         }

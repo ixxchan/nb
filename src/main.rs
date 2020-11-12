@@ -22,13 +22,11 @@ fn main() {
         .get_matches();
 
     let addr = matches.value_of("addr").unwrap();
-
+    let addr = addr.to_owned();
     env_logger::from_env(Env::default().default_filter_or("debug")).init();
 
     info!("nb {}", env!("CARGO_PKG_VERSION"));
     info!("Listening on {}", addr);
 
-    if let Err(e) = Node::run(addr.to_owned()) {
-        eprintln!("Error when running node: {}", e);
-    }
+    tokio::spawn(async move { Node::handle_events(addr).await.unwrap() });
 }

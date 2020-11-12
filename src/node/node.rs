@@ -3,9 +3,9 @@ use super::*;
 use serde_json::Deserializer;
 use std::collections::HashSet;
 use std::io::{stdout, Write};
-use std::net::{TcpStream, TcpListener};
-use std::sync::mpsc::{channel, Receiver, Sender};
+use std::net::{TcpListener, TcpStream};
 use std::thread;
+use tokio::sync::mpsc::{channel, Receiver, Sender};
 
 pub enum Event {
     Request(TcpStream, Request),
@@ -20,14 +20,15 @@ pub struct Node {
     chain: Blockchain,
     peers: HashSet<PeerInfo>,
     broadcast_sender: Sender<Event>,
-    event_receiver: Receiver<Event>,
 }
 
+const EVENT_BUFFER_SIZE: usize = 10;
+
 impl Node {
-    pub fn run(addr: String) -> Result<()> {
+    pub async fn handle_events(addr: String) -> Result<()> {
         let listener = TcpListener::bind(&addr)?;
 
-        let (sender, receiver) = channel();
+        let (sender, mut receiver) = channel(EVENT_BUFFER_SIZE);
         let sender1 = sender.clone();
         let sender2 = sender.clone();
         thread::spawn(move || message::handle_incoming_connections(listener, sender1));
@@ -38,12 +39,12 @@ impl Node {
             chain: Blockchain::new(),
             peers: HashSet::new(),
             broadcast_sender: sender,
-            event_receiver: receiver,
         };
 
         loop {
+            let event = receiver.recv().await.unwrap();
             // TODO: result not used
-            let _result = match node.event_receiver.recv().unwrap() {
+            let _result = match event {
                 Event::Request(stream, request) => node.serve_request(stream, request),
                 Event::_Response(_response) => unimplemented!(),
                 Event::Broadcast(request) => node.broadcast_request(&request),
@@ -220,7 +221,7 @@ impl Node {
         };
     }
 
-    fn async_broadcast_transaction(&self, transaction: Transaction) {
+    async fn async_broadcast_transaction(&self, transaction: Transaction) {
         // add this transaction to broadcast channel
         // which will then send it asynchronously
         self.broadcast_sender
@@ -228,29 +229,30 @@ impl Node {
                 self.basic_info.clone(),
                 transaction,
             )))
-            .unwrap();
+            .await;
     }
 
-    fn async_broadcast_block(&self, block: Block) {
+    async fn async_broadcast_block(&self, block: Block) {
         self.broadcast_sender
             .send(Event::Broadcast(Request::NewBlock(
                 self.get_basic_info(),
                 block,
             )))
-            .unwrap();
+            .await;
     }
 
-    fn async_broadcast_latest_block(&self) {
+    async fn async_broadcast_latest_block(&self) {
         self.async_broadcast_block(self.chain.last_block().to_owned())
+            .await
     }
 
-    fn async_broadcast_peer(&self, peer: PeerInfo) {
+    async fn async_broadcast_peer(&self, peer: PeerInfo) {
         self.broadcast_sender
             .send(Event::Broadcast(Request::NewPeer(
                 self.get_basic_info(),
                 peer,
             )))
-            .unwrap();
+            .await;
     }
 
     fn broadcast_request(&self, req: &Request) -> Result<()> {
